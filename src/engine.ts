@@ -1,3 +1,4 @@
+import { publishEngineEvent } from './lib/diagnostics.js';
 import type {
   ContextSummary,
   ProcessResult,
@@ -5,8 +6,10 @@ import type {
   ThoughtData,
 } from './lib/types.js';
 
-const DEFAULT_MAX_THOUGHTS = 1000;
+const DEFAULT_MAX_THOUGHTS = 500;
 const MAX_THOUGHTS_CAP = 10000;
+const MAX_MEMORY_BYTES = 100 * 1024 * 1024; // 100MB soft cap
+const ESTIMATED_THOUGHT_OVERHEAD_BYTES = 200;
 
 function normalizeMaxThoughts(value?: number): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
@@ -95,13 +98,42 @@ export class ThinkingEngine {
     if (input.isRevision || input.branchFromThought) {
       return;
     }
+
+    // Warn on non-sequential numbers (don't error - may be intentional)
+    if (lastThought && input.thoughtNumber !== lastThought.thoughtNumber + 1) {
+      publishEngineEvent({
+        type: 'engine.sequence_gap',
+        ts: Date.now(),
+        expected: lastThought.thoughtNumber + 1,
+        received: input.thoughtNumber,
+      });
+    }
   }
 
   private pruneHistoryIfNeeded(): void {
+    // Count-based pruning
+    let pruned = false;
     const excess = this.thoughts.length - this.maxThoughts;
-    if (excess <= 0) return;
-    this.thoughts.splice(0, excess);
-    this.rebuildBranches();
+    if (excess > 0) {
+      this.thoughts.splice(0, excess);
+      pruned = true;
+    }
+
+    // Memory-aware pruning: estimate current memory usage
+    const estimatedBytes = this.thoughts.reduce((sum, t) => {
+      return sum + t.thought.length * 2 + ESTIMATED_THOUGHT_OVERHEAD_BYTES;
+    }, 0);
+
+    if (estimatedBytes > MAX_MEMORY_BYTES && this.thoughts.length > 10) {
+      // Prune oldest 20% when over memory threshold
+      const toRemove = Math.ceil(this.thoughts.length * 0.2);
+      this.thoughts.splice(0, toRemove);
+      pruned = true;
+    }
+
+    if (pruned) {
+      this.rebuildBranches();
+    }
   }
 
   private rebuildBranches(): void {

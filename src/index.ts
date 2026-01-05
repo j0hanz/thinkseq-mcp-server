@@ -7,6 +7,18 @@ import { publishLifecycleEvent } from './lib/diagnostics.js';
 import { readSelfPackageJson } from './lib/package.js';
 import { registerAllTools } from './tools/index.js';
 
+// Process error handlers - must be registered early
+process.on('unhandledRejection', (reason: unknown) => {
+  const message = reason instanceof Error ? reason.message : String(reason);
+  console.error(`thinkseq: unhandledRejection: ${message}`);
+  process.exit(1);
+});
+
+process.on('uncaughtException', (error: Error) => {
+  console.error(`thinkseq: uncaughtException: ${error.message}`);
+  process.exit(1);
+});
+
 const tryClose = async (value: unknown): Promise<void> => {
   const maybeClose = value as { close?: () => Promise<void> | void };
   if (typeof maybeClose.close === 'function') {
