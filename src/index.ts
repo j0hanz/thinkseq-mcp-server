@@ -4,6 +4,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 
 import { ThinkingEngine } from './engine.js';
 import { publishLifecycleEvent } from './lib/diagnostics.js';
+import type { PackageInfo } from './lib/package.js';
 import { readSelfPackageJson } from './lib/package.js';
 import { registerAllTools } from './tools/index.js';
 
@@ -26,33 +27,42 @@ const tryClose = async (value: unknown): Promise<void> => {
   }
 };
 
+const SERVER_INSTRUCTIONS = `ThinkSeq is a tool for structured, sequential thinking.
+Use it to break down complex problems into steps, with support for branching and revision.
+Each thought builds on previous ones. You can branch to explore alternatives or revise earlier thinking.`;
+
 const PACKAGE_READ_TIMEOUT_MS = 2000;
 
-async function main(): Promise<void> {
-  const pkg = await readSelfPackageJson(
-    AbortSignal.timeout(PACKAGE_READ_TIMEOUT_MS)
-  );
-  const name = pkg.name ?? 'thinkseq';
-  const version = pkg.version ?? '0.0.0';
+function normalizePackageInfo(pkg: PackageInfo): {
+  name: string;
+  version: string;
+} {
+  return {
+    name: pkg.name ?? 'thinkseq',
+    version: pkg.version ?? '0.0.0',
+  };
+}
 
-  publishLifecycleEvent({ type: 'lifecycle.started', ts: Date.now() });
-
-  const server = new McpServer(
+function createServer(name: string, version: string): McpServer {
+  return new McpServer(
     { name, version },
     {
-      instructions: `ThinkSeq is a tool for structured, sequential thinking.
-Use it to break down complex problems into steps, with support for branching and revision.
-Each thought builds on previous ones. You can branch to explore alternatives or revise earlier thinking.`,
+      instructions: SERVER_INSTRUCTIONS,
       capabilities: { logging: {} },
     }
   );
+}
 
-  const engine = new ThinkingEngine();
-  registerAllTools(server, engine);
-
+async function connectServer(server: McpServer): Promise<StdioServerTransport> {
   const transport = new StdioServerTransport();
   await server.connect(transport);
+  return transport;
+}
 
+function installShutdownHandlers(
+  server: McpServer,
+  transport: StdioServerTransport
+): void {
   let shuttingDown = false;
   const shutdown = async (signal: string): Promise<void> => {
     if (shuttingDown) return;
@@ -83,6 +93,22 @@ Each thought builds on previous ones. You can branch to explore alternatives or 
   process.on('SIGINT', () => {
     void shutdown('SIGINT');
   });
+}
+
+async function main(): Promise<void> {
+  const pkg = await readSelfPackageJson(
+    AbortSignal.timeout(PACKAGE_READ_TIMEOUT_MS)
+  );
+  const { name, version } = normalizePackageInfo(pkg);
+
+  publishLifecycleEvent({ type: 'lifecycle.started', ts: Date.now() });
+
+  const server = createServer(name, version);
+  const engine = new ThinkingEngine();
+  registerAllTools(server, engine);
+
+  const transport = await connectServer(server);
+  installShutdownHandlers(server, transport);
 }
 
 main().catch((err: unknown) => {

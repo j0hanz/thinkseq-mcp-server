@@ -29,34 +29,43 @@ export class ThinkingEngine {
   }
 
   processThought(input: ThoughtData): ProcessResult {
-    // 1. Validate sequence
     this.validateThoughtNumber(input);
 
-    // 2. Auto-adjust totalThoughts if needed
-    const totalThoughts = Math.max(input.totalThoughts, input.thoughtNumber);
+    const stored = this.createStoredThought(input);
+    this.storeThought(stored);
 
-    // 3. Store thought
-    const stored: StoredThought = {
+    this.pruneHistoryIfNeeded();
+
+    return this.buildProcessResult(stored, input);
+  }
+
+  private createStoredThought(input: ThoughtData): StoredThought {
+    const totalThoughts = Math.max(input.totalThoughts, input.thoughtNumber);
+    return {
       ...input,
       totalThoughts,
       timestamp: Date.now(),
       branchPath: this.getBranchPath(input),
     };
+  }
 
+  private storeThought(stored: StoredThought): void {
     this.thoughts.push(stored);
+    this.trackBranch(stored);
+  }
 
-    // 4. Track branches
-    if (input.branchId) {
-      const branch = this.branches.get(input.branchId) ?? [];
-      branch.push(stored);
-      this.branches.set(input.branchId, branch);
-    }
+  private trackBranch(stored: StoredThought): void {
+    if (!stored.branchId) return;
+    const branch = this.branches.get(stored.branchId) ?? [];
+    branch.push(stored);
+    this.branches.set(stored.branchId, branch);
+  }
 
-    this.pruneHistoryIfNeeded();
-
-    // 5. Build context summary (not full history!)
+  private buildProcessResult(
+    stored: StoredThought,
+    input: ThoughtData
+  ): ProcessResult {
     const context = this.buildContextSummary();
-
     return {
       ok: true,
       result: {
@@ -87,27 +96,42 @@ export class ThinkingEngine {
   private validateThoughtNumber(input: ThoughtData): void {
     const lastThought = this.thoughts.at(-1);
 
-    // First thought must be 1
-    if (!lastThought && input.thoughtNumber !== 1) {
-      throw new Error(
-        `First thought must be number 1, got ${String(input.thoughtNumber)}`
-      );
-    }
-
-    // Revisions and branches can have any valid number
-    if (input.isRevision || input.branchFromThought) {
+    if (!lastThought) {
+      this.ensureFirstThought(input.thoughtNumber);
       return;
     }
 
-    // Warn on non-sequential numbers (don't error - may be intentional)
-    if (lastThought && input.thoughtNumber !== lastThought.thoughtNumber + 1) {
-      publishEngineEvent({
-        type: 'engine.sequence_gap',
-        ts: Date.now(),
-        expected: lastThought.thoughtNumber + 1,
-        received: input.thoughtNumber,
-      });
+    if (this.isRevisionOrBranch(input)) {
+      return;
     }
+
+    this.warnOnSequenceGap(lastThought, input.thoughtNumber);
+  }
+
+  private ensureFirstThought(thoughtNumber: number): void {
+    if (thoughtNumber === 1) return;
+    throw new Error(
+      `First thought must be number 1, got ${String(thoughtNumber)}`
+    );
+  }
+
+  private isRevisionOrBranch(input: ThoughtData): boolean {
+    const isRevision = input.isRevision === true;
+    const isBranch = input.branchFromThought !== undefined;
+    return isRevision || isBranch;
+  }
+
+  private warnOnSequenceGap(
+    lastThought: StoredThought,
+    thoughtNumber: number
+  ): void {
+    if (thoughtNumber === lastThought.thoughtNumber + 1) return;
+    publishEngineEvent({
+      type: 'engine.sequence_gap',
+      ts: Date.now(),
+      expected: lastThought.thoughtNumber + 1,
+      received: thoughtNumber,
+    });
   }
 
   private pruneHistoryIfNeeded(): void {

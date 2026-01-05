@@ -8,7 +8,7 @@ export default defineConfig(
   { ignores: ['dist', 'node_modules', '*.config.mjs', '*.config.js'] },
   eslint.configs.recommended,
   {
-    files: ['src/**/*.ts'],
+    files: ['src/**/*.ts', 'tests/**/*.ts', 'benchmark/**/*.ts'],
     extends: [
       tseslint.configs.strictTypeChecked,
       tseslint.configs.stylisticTypeChecked,
@@ -17,7 +17,7 @@ export default defineConfig(
       ecmaVersion: 2022,
       sourceType: 'module',
       parserOptions: {
-        projectService: true,
+        project: './tsconfig.eslint.json',
         tsconfigRootDir: import.meta.dirname,
       },
     },
@@ -43,6 +43,16 @@ export default defineConfig(
         { checksVoidReturn: { arguments: false } },
       ],
       '@typescript-eslint/only-throw-error': 'error',
+      complexity: ['error', { max: 5, variant: 'classic' }],
+      'max-depth': ['error', 2],
+      'max-lines': [
+        'error',
+        { max: 300, skipBlankLines: true, skipComments: true },
+      ],
+      'max-lines-per-function': [
+        'error',
+        { max: 40, skipBlankLines: true, skipComments: true },
+      ],
       'prefer-const': 'error',
       'no-var': 'error',
     },

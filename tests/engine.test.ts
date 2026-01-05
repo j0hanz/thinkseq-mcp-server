@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict';
-import diagnostics_channel from 'node:diagnostics_channel';
 import { describe, it } from 'node:test';
 
 import { ThinkingEngine } from '../src/engine.js';
+import {
+  assertSequenceGapMessage,
+  captureDiagnostics,
+} from './helpers/diagnostics.js';
 
-describe('ThinkingEngine', () => {
-  it('should process a simple thought', () => {
+void describe('ThinkingEngine.basic', () => {
+  void it('should process a simple thought', () => {
     const engine = new ThinkingEngine();
     const result = engine.processThought({
       thought: 'Initial thought',
@@ -15,11 +18,14 @@ describe('ThinkingEngine', () => {
     });
 
     assert.ok(result.ok);
-    assert.strictEqual(result.result?.thoughtNumber, 1);
-    assert.strictEqual(result.result?.context.recentThoughts.length, 1);
+    assert.ok(result.result);
+    assert.strictEqual(result.result.thoughtNumber, 1);
+    assert.strictEqual(result.result.context.recentThoughts.length, 1);
   });
+});
 
-  it('should validate sequence order', () => {
+void describe('ThinkingEngine.sequence', () => {
+  void it('should validate sequence order', () => {
     const engine = new ThinkingEngine();
     // First thought
     engine.processThought({
@@ -39,7 +45,7 @@ describe('ThinkingEngine', () => {
     assert.ok(res.ok);
   });
 
-  it('should enforce first thought is 1', () => {
+  void it('should enforce first thought is 1', () => {
     const engine = new ThinkingEngine();
     assert.throws(() => {
       engine.processThought({
@@ -50,15 +56,11 @@ describe('ThinkingEngine', () => {
       });
     }, /First thought must be number 1/);
   });
+});
 
-  it('should emit diagnostics event on sequence gap', async (t) => {
-    const messages: unknown[] = [];
-    const handler = (message: unknown): void => {
-      messages.push(message);
-    };
-
-    diagnostics_channel.subscribe('thinkseq:engine', handler);
-    t.after(() => diagnostics_channel.unsubscribe('thinkseq:engine', handler));
+void describe('ThinkingEngine.sequence diagnostics', () => {
+  void it('should emit diagnostics event on sequence gap', async (t) => {
+    const { messages } = captureDiagnostics(t, 'thinkseq:engine');
 
     const engine = new ThinkingEngine();
     engine.processThought({
@@ -78,18 +80,12 @@ describe('ThinkingEngine', () => {
 
     await Promise.resolve();
 
-    assert.equal(messages.length, 1);
-    const msg = messages[0] as {
-      type?: unknown;
-      expected?: unknown;
-      received?: unknown;
-    };
-    assert.equal(msg.type, 'engine.sequence_gap');
-    assert.equal(msg.expected, 2);
-    assert.equal(msg.received, 5);
+    assertSequenceGapMessage(messages, 2, 5);
   });
+});
 
-  it('should prune old thoughts when count exceeds max', () => {
+void describe('ThinkingEngine.pruning', () => {
+  void it('should prune old thoughts when count exceeds max', () => {
     const engine = new ThinkingEngine(5); // Small limit for testing
 
     // Add 7 thoughts

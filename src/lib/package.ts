@@ -5,6 +5,11 @@ export interface PackageInfo {
   version?: string | undefined;
 }
 
+interface NodeModuleFacade {
+  findPackageJSON?: (specifier: string, base?: string) => string | undefined;
+  createRequire: (url: string) => (id: string) => unknown;
+}
+
 const PACKAGE_JSON_TIMEOUT_MS = 2000;
 
 let cached: Promise<PackageInfo> | undefined;
@@ -26,58 +31,47 @@ function getEffectiveSignal(signal?: AbortSignal): AbortSignal {
   return AbortSignal.any([signal, timeoutSignal]);
 }
 
+async function readPackageJsonViaFind(
+  nodeModule: NodeModuleFacade,
+  signal?: AbortSignal
+): Promise<PackageInfo | undefined> {
+  if (typeof nodeModule.findPackageJSON !== 'function') return undefined;
+  const packageJsonPath = nodeModule.findPackageJSON('.', import.meta.url);
+  if (!packageJsonPath) return undefined;
+
+  const raw = await readFile(packageJsonPath, {
+    encoding: 'utf8',
+    signal: getEffectiveSignal(signal),
+  });
+  return parsePackageJson(raw);
+}
+
+function readPackageJsonViaRequire(nodeModule: NodeModuleFacade): PackageInfo {
+  const req = nodeModule.createRequire(import.meta.url);
+  const pkg = req('../package.json');
+
+  if (typeof pkg !== 'object' || pkg === null) return {};
+  const obj = pkg as Record<string, unknown>;
+
+  return {
+    name: typeof obj.name === 'string' ? obj.name : undefined,
+    version: typeof obj.version === 'string' ? obj.version : undefined,
+  };
+}
+
+async function loadPackageInfo(signal?: AbortSignal): Promise<PackageInfo> {
+  const nodeModule = (await import('node:module')) as NodeModuleFacade;
+  const viaFind = await readPackageJsonViaFind(nodeModule, signal);
+  if (viaFind !== undefined) return viaFind;
+  return readPackageJsonViaRequire(nodeModule);
+}
+
 export async function readSelfPackageJson(
   signal?: AbortSignal
 ): Promise<PackageInfo> {
-  if (cached) {
-    return cached;
-  }
-
-  const promise = (async (): Promise<PackageInfo> => {
-    const nodeModule = await import('node:module');
-
-    const maybeFind = (nodeModule as unknown as { findPackageJSON?: unknown })
-      .findPackageJSON;
-
-    if (typeof maybeFind === 'function') {
-      const findPackageJSON = maybeFind as (
-        specifier: string,
-        base?: string
-      ) => string | undefined;
-
-      const packageJsonPath = findPackageJSON('.', import.meta.url);
-      if (!packageJsonPath) return {};
-
-      const raw = await readFile(packageJsonPath, {
-        encoding: 'utf8',
-        signal: getEffectiveSignal(signal),
-      });
-      return parsePackageJson(raw);
-    }
-
-    // Fallback for older Node: use createRequire.
-    const createRequire = (
-      nodeModule as unknown as {
-        createRequire: (url: string) => (id: string) => unknown;
-      }
-    ).createRequire;
-
-    const req = createRequire(import.meta.url);
-    const pkg = req('../package.json');
-
-    if (typeof pkg !== 'object' || pkg === null) return {};
-    const obj = pkg as Record<string, unknown>;
-
-    return {
-      name: typeof obj.name === 'string' ? obj.name : undefined,
-      version: typeof obj.version === 'string' ? obj.version : undefined,
-    };
-  })();
-
-  cached = promise;
-
+  cached ??= loadPackageInfo(signal);
   try {
-    return await promise;
+    return await cached;
   } catch (err) {
     // Clear cache on failure so next call can retry
     cached = undefined;

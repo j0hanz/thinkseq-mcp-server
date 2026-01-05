@@ -9,8 +9,8 @@ interface RawPkg {
   version?: unknown;
 }
 
-describe('package.readSelfPackageJson', () => {
-  it('returns name/version matching package.json', async () => {
+void describe('package.readSelfPackageJson', () => {
+  void it('returns name/version matching package.json', async () => {
     const raw = await readFile(
       new URL('../package.json', import.meta.url),
       'utf8'
@@ -27,7 +27,7 @@ describe('package.readSelfPackageJson', () => {
     assert.equal(pkg.version, expectedVersion);
   });
 
-  it('is stable across multiple calls (cached)', async () => {
+  void it('is stable across multiple calls (cached)', async () => {
     const a = await readSelfPackageJson();
     const b = await readSelfPackageJson();
     assert.deepEqual(a, b);

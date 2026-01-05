@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import diagnostics_channel from 'node:diagnostics_channel';
 import { describe, it } from 'node:test';
 
 import {
@@ -7,9 +6,13 @@ import {
   publishLifecycleEvent,
   publishToolEvent,
 } from '../src/lib/diagnostics.js';
+import {
+  assertSequenceGapMessage,
+  captureDiagnostics,
+} from './helpers/diagnostics.js';
 
-describe('diagnostics', () => {
-  it('publishToolEvent does not throw without subscribers', () => {
+void describe('publishToolEvent', () => {
+  void it('does not throw without subscribers', () => {
     assert.doesNotThrow(() => {
       publishToolEvent({
         type: 'tool.start',
@@ -19,14 +22,8 @@ describe('diagnostics', () => {
     });
   });
 
-  it('publishToolEvent publishes when subscribed', async (t) => {
-    const messages: unknown[] = [];
-    const handler = (message: unknown): void => {
-      messages.push(message);
-    };
-
-    diagnostics_channel.subscribe('thinkseq:tool', handler);
-    t.after(() => diagnostics_channel.unsubscribe('thinkseq:tool', handler));
+  void it('publishes when subscribed', async (t) => {
+    const { messages } = captureDiagnostics(t, 'thinkseq:tool');
 
     publishToolEvent({ type: 'tool.start', tool: 'thinkseq', ts: 123 });
 
@@ -34,19 +31,27 @@ describe('diagnostics', () => {
     await Promise.resolve();
 
     assert.equal(messages.length, 1);
-    const msg = messages[0] as { type?: unknown; tool?: unknown; ts?: unknown };
+    const msg = messages[0] as {
+      type?: unknown;
+      tool?: unknown;
+      ts?: unknown;
+    };
     assert.equal(msg.type, 'tool.start');
     assert.equal(msg.tool, 'thinkseq');
     assert.equal(msg.ts, 123);
   });
+});
 
-  it('publishLifecycleEvent does not throw without subscribers', () => {
+void describe('publishLifecycleEvent', () => {
+  void it('does not throw without subscribers', () => {
     assert.doesNotThrow(() => {
       publishLifecycleEvent({ type: 'lifecycle.started', ts: Date.now() });
     });
   });
+});
 
-  it('publishEngineEvent does not throw without subscribers', () => {
+void describe('publishEngineEvent', () => {
+  void it('does not throw without subscribers', () => {
     assert.doesNotThrow(() => {
       publishEngineEvent({
         type: 'engine.sequence_gap',
@@ -57,14 +62,8 @@ describe('diagnostics', () => {
     });
   });
 
-  it('publishEngineEvent publishes when subscribed', async (t) => {
-    const messages: unknown[] = [];
-    const handler = (message: unknown): void => {
-      messages.push(message);
-    };
-
-    diagnostics_channel.subscribe('thinkseq:engine', handler);
-    t.after(() => diagnostics_channel.unsubscribe('thinkseq:engine', handler));
+  void it('publishes when subscribed', async (t) => {
+    const { messages } = captureDiagnostics(t, 'thinkseq:engine');
 
     publishEngineEvent({
       type: 'engine.sequence_gap',
@@ -75,14 +74,6 @@ describe('diagnostics', () => {
 
     await Promise.resolve();
 
-    assert.equal(messages.length, 1);
-    const msg = messages[0] as {
-      type?: unknown;
-      expected?: unknown;
-      received?: unknown;
-    };
-    assert.equal(msg.type, 'engine.sequence_gap');
-    assert.equal(msg.expected, 2);
-    assert.equal(msg.received, 10);
+    assertSequenceGapMessage(messages, 2, 10);
   });
 });
