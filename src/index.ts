@@ -1,40 +1,76 @@
 #!/usr/bin/env node
-import { createRequire } from 'node:module';
-
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 
 import { ThinkingEngine } from './engine.js';
+import { publishLifecycleEvent } from './lib/diagnostics.js';
+import { readSelfPackageJson } from './lib/package.js';
 import { registerAllTools } from './tools/index.js';
 
-const require = createRequire(import.meta.url);
-const pkg = require('../package.json') as { version: string };
+const tryClose = async (value: unknown): Promise<void> => {
+  const maybeClose = value as { close?: () => Promise<void> | void };
+  if (typeof maybeClose.close === 'function') {
+    await maybeClose.close();
+  }
+};
 
-const server = new McpServer(
-  { name: 'thinkseq', version: pkg.version },
-  {
-    instructions: `ThinkSeq is a tool for structured, sequential thinking.
+async function main(): Promise<void> {
+  const pkg = await readSelfPackageJson();
+  const name = pkg.name ?? 'thinkseq';
+  const version = pkg.version ?? '0.0.0';
+
+  publishLifecycleEvent({ type: 'lifecycle.started', ts: Date.now() });
+
+  const server = new McpServer(
+    { name, version },
+    {
+      instructions: `ThinkSeq is a tool for structured, sequential thinking.
 Use it to break down complex problems into steps, with support for branching and revision.
 Each thought builds on previous ones. You can branch to explore alternatives or revise earlier thinking.`,
-    capabilities: { logging: {} },
-  }
-);
+      capabilities: { logging: {} },
+    }
+  );
 
-const engine = new ThinkingEngine();
-registerAllTools(server, engine);
+  const engine = new ThinkingEngine();
+  registerAllTools(server, engine);
 
-// Graceful shutdown
-process.on('SIGTERM', () => process.exit(0));
-process.on('SIGINT', () => process.exit(0));
-
-// Start server
-async function startServer(): Promise<void> {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error('ThinkSeq MCP server running on stdio');
+
+  let shuttingDown = false;
+  const shutdown = async (signal: string): Promise<void> => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+
+    publishLifecycleEvent({
+      type: 'lifecycle.shutdown',
+      ts: Date.now(),
+      signal,
+    });
+
+    try {
+      await tryClose(server);
+    } catch {
+      // Never crash on shutdown.
+    }
+    try {
+      await tryClose(transport);
+    } catch {
+      // Never crash on shutdown.
+    }
+    process.exit(0);
+  };
+
+  process.on('SIGTERM', () => {
+    void shutdown('SIGTERM');
+  });
+  process.on('SIGINT', () => {
+    void shutdown('SIGINT');
+  });
 }
 
-startServer().catch((err: unknown) => {
-  console.error('Server error:', err);
+main().catch((err: unknown) => {
+  const message = err instanceof Error ? err.message : String(err);
+  console.error(`thinkseq: fatal: ${message}`);
   process.exit(1);
 });

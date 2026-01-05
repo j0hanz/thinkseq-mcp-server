@@ -77,40 +77,13 @@ export class ThinkingEngine {
     if (input.isRevision || input.branchFromThought) {
       return;
     }
-
-    // Sequential thoughts should increment
-    if (lastThought && input.thoughtNumber !== lastThought.thoughtNumber + 1) {
-      // Warning, not error - allow flexibility
-      console.error(
-        `Warning: Expected thought ${String(
-          lastThought.thoughtNumber + 1
-        )}, got ${String(input.thoughtNumber)}`
-      );
-    }
   }
 
   private getBranchPath(input: ThoughtData): string[] {
-    // Simple implementation: return current branch ID if present
     return input.branchId ? [input.branchId] : [];
   }
 
   private getCurrentBranch(): string | undefined {
     return this.thoughts.at(-1)?.branchId;
-  }
-
-  // Get all thoughts for a specific branch
-  getBranchThoughts(branchId: string): StoredThought[] {
-    return this.branches.get(branchId) ?? [];
-  }
-
-  // Get main line thoughts (no branch)
-  getMainLineThoughts(): StoredThought[] {
-    return this.thoughts.filter((t) => !t.branchId);
-  }
-
-  // Reset for new session
-  reset(): void {
-    this.thoughts = [];
-    this.branches.clear();
   }
 }

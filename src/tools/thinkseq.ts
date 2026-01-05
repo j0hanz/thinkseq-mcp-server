@@ -1,6 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 import type { ThinkingEngine } from '../engine.js';
+import { publishToolEvent } from '../lib/diagnostics.js';
 import { createErrorResponse, getErrorMessage } from '../lib/errors.js';
 import { createToolResponse } from '../lib/tool_response.js';
 import { ThinkSeqInputSchema } from '../schemas/inputs.js';
@@ -13,36 +14,50 @@ export function registerThinkSeq(
   server.registerTool(
     'thinkseq',
     {
-      title: 'Think Sequentialtly',
-      description: `This tool helps you structure your thinking process in a sequential manner.
-    
-Use this when you need to:
-- Break down complex problems into manageable steps
-- Explore multiple solution paths (branching)
-- Revise earlier thinking based on new insights
-- Track your reasoning process
+      title: 'Think Sequentially',
+      description: `Structured sequential thinking with branching and revision support.
 
-Parameters:
-- thought: Your current thinking step
-- thoughtNumber: Current step number (starts at 1)
-- totalThoughts: Estimated total steps (can adjust as you go)
-- nextThoughtNeeded: Set false only when you have a final answer
-- branchFromThought/branchId: Create alternative reasoning paths
-- isRevision/revisesThought: Correct earlier thoughts
-- thoughtType: Optional categorization (analysis/hypothesis/verification/conclusion)`,
+Use for:
+- Breaking down complex problems into steps
+- Exploring alternative solution paths (branching)
+- Revising earlier thinking based on new insights
+
+Key parameters:
+- thought: Current thinking step
+- thoughtNumber: Step number (starts at 1)
+- totalThoughts: Estimated total (adjustable)
+- nextThoughtNeeded: false only when done`,
       inputSchema: ThinkSeqInputSchema,
       outputSchema: ThinkSeqOutputSchema,
       annotations: {
         readOnlyHint: false,
-        idempotentHint: false, // Each thought changes state
+        idempotentHint: false,
       },
     },
-    (input, _extra) => {
-      void _extra;
+    (input) => {
+      publishToolEvent({
+        type: 'tool.start',
+        tool: 'thinkseq',
+        ts: Date.now(),
+      });
       try {
         const result = engine.processThought(input);
+        publishToolEvent({
+          type: 'tool.end',
+          tool: 'thinkseq',
+          ts: Date.now(),
+          ok: true,
+        });
         return createToolResponse(result);
       } catch (err) {
+        publishToolEvent({
+          type: 'tool.end',
+          tool: 'thinkseq',
+          ts: Date.now(),
+          ok: false,
+          errorCode: 'E_THINK',
+          errorMessage: getErrorMessage(err),
+        });
         return createErrorResponse('E_THINK', getErrorMessage(err));
       }
     }
