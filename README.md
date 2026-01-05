@@ -1,5 +1,7 @@
 # ThinkSeq MCP Server
 
+<img src="docs/logo.png" alt="Filesystem Context MCP Server Logo" width="175">
+
 An MCP implementation for advanced reasoning and thinking sequences.
 
 ## Features
