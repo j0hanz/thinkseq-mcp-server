@@ -14,8 +14,12 @@ const tryClose = async (value: unknown): Promise<void> => {
   }
 };
 
+const PACKAGE_READ_TIMEOUT_MS = 2000;
+
 async function main(): Promise<void> {
-  const pkg = await readSelfPackageJson();
+  const pkg = await readSelfPackageJson(
+    AbortSignal.timeout(PACKAGE_READ_TIMEOUT_MS)
+  );
   const name = pkg.name ?? 'thinkseq';
   const version = pkg.version ?? '0.0.0';
 

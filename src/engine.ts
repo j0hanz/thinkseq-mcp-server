@@ -5,9 +5,25 @@ import type {
   ThoughtData,
 } from './lib/types.js';
 
+const DEFAULT_MAX_THOUGHTS = 1000;
+const MAX_THOUGHTS_CAP = 10000;
+
+function normalizeMaxThoughts(value?: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return DEFAULT_MAX_THOUGHTS;
+  }
+  const clamped = Math.max(1, Math.min(MAX_THOUGHTS_CAP, Math.trunc(value)));
+  return clamped;
+}
+
 export class ThinkingEngine {
   private thoughts: StoredThought[] = [];
   private branches = new Map<string, StoredThought[]>();
+  private readonly maxThoughts: number;
+
+  constructor(maxThoughts?: number) {
+    this.maxThoughts = normalizeMaxThoughts(maxThoughts);
+  }
 
   processThought(input: ThoughtData): ProcessResult {
     // 1. Validate sequence
@@ -32,6 +48,8 @@ export class ThinkingEngine {
       branch.push(stored);
       this.branches.set(input.branchId, branch);
     }
+
+    this.pruneHistoryIfNeeded();
 
     // 5. Build context summary (not full history!)
     const context = this.buildContextSummary();
@@ -76,6 +94,23 @@ export class ThinkingEngine {
     // Revisions and branches can have any valid number
     if (input.isRevision || input.branchFromThought) {
       return;
+    }
+  }
+
+  private pruneHistoryIfNeeded(): void {
+    const excess = this.thoughts.length - this.maxThoughts;
+    if (excess <= 0) return;
+    this.thoughts.splice(0, excess);
+    this.rebuildBranches();
+  }
+
+  private rebuildBranches(): void {
+    this.branches = new Map<string, StoredThought[]>();
+    for (const thought of this.thoughts) {
+      if (!thought.branchId) continue;
+      const branch = this.branches.get(thought.branchId) ?? [];
+      branch.push(thought);
+      this.branches.set(thought.branchId, branch);
     }
   }
 

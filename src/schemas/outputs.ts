@@ -15,7 +15,15 @@ export const ThinkSeqOutputSchema = z.strictObject({
             z.strictObject({
               number: z.number(),
               preview: z.string(),
-              type: z.string().optional(),
+              type: z
+                .enum([
+                  'analysis',
+                  'hypothesis',
+                  'verification',
+                  'revision',
+                  'conclusion',
+                ])
+                .optional(),
             })
           )
           .max(5),

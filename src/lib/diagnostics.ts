@@ -65,12 +65,20 @@ function toSafeLogObject(message: unknown): Record<string, unknown> | null {
 
 export function publishToolEvent(event: ToolEvent): void {
   if (!toolChannel.hasSubscribers) return;
-  toolChannel.publish(event);
+  try {
+    toolChannel.publish(event);
+  } catch {
+    // Never throw from diagnostics publish.
+  }
 }
 
 export function publishLifecycleEvent(event: LifecycleEvent): void {
   if (!lifecycleChannel.hasSubscribers) return;
-  lifecycleChannel.publish(event);
+  try {
+    lifecycleChannel.publish(event);
+  } catch {
+    // Never throw from diagnostics publish.
+  }
 }
 
 export function enableStderrSubscriber(logFormat: LogFormat): void {

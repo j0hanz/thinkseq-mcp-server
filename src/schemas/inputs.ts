@@ -33,7 +33,7 @@ export const ThinkSeqInputSchema = z.strictObject({
     .min(1)
     .optional()
     .describe('Branching point thought number'),
-  branchId: z.string().max(100).optional().describe('Branch identifier'),
+  branchId: z.string().min(1).max(100).optional().describe('Branch identifier'),
   thoughtType: z
     .enum(['analysis', 'hypothesis', 'verification', 'revision', 'conclusion'])
     .optional()

@@ -1,9 +1,11 @@
 import { readFile } from 'node:fs/promises';
 
 export interface PackageInfo {
-  name?: string;
-  version?: string;
+  name?: string | undefined;
+  version?: string | undefined;
 }
+
+const PACKAGE_JSON_TIMEOUT_MS = 2000;
 
 let cached: Promise<PackageInfo> | undefined;
 
@@ -16,6 +18,12 @@ function parsePackageJson(raw: string): PackageInfo {
     name: typeof obj.name === 'string' ? obj.name : undefined,
     version: typeof obj.version === 'string' ? obj.version : undefined,
   };
+}
+
+function getEffectiveSignal(signal?: AbortSignal): AbortSignal {
+  const timeoutSignal = AbortSignal.timeout(PACKAGE_JSON_TIMEOUT_MS);
+  if (!signal) return timeoutSignal;
+  return AbortSignal.any([signal, timeoutSignal]);
 }
 
 export async function readSelfPackageJson(
@@ -40,7 +48,7 @@ export async function readSelfPackageJson(
 
         const raw = await readFile(packageJsonPath, {
           encoding: 'utf8',
-          signal,
+          signal: getEffectiveSignal(signal),
         });
         return parsePackageJson(raw);
       }

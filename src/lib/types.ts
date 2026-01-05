@@ -10,11 +10,11 @@ export interface ThoughtData {
   thoughtNumber: number;
   totalThoughts: number;
   nextThoughtNeeded: boolean;
-  isRevision?: boolean;
-  revisesThought?: number;
-  branchFromThought?: number;
-  branchId?: string;
-  thoughtType?: ThoughtType;
+  isRevision?: boolean | undefined;
+  revisesThought?: number | undefined;
+  branchFromThought?: number | undefined;
+  branchId?: string | undefined;
+  thoughtType?: ThoughtType | undefined;
 }
 
 export interface StoredThought extends ThoughtData {
@@ -26,9 +26,9 @@ export interface ContextSummary {
   recentThoughts: {
     number: number;
     preview: string;
-    type?: ThoughtType;
+    type?: ThoughtType | undefined;
   }[];
-  currentBranch?: string;
+  currentBranch?: string | undefined;
   hasRevisions: boolean;
 }
 
