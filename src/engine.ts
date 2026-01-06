@@ -29,6 +29,8 @@ function normalizeInt(
 export class ThinkingEngine {
   #thoughts: StoredThought[] = [];
   #branches = new Map<string, StoredThought[]>();
+  #branchIdsCache: string[] = [];
+  #branchIdsDirty = true;
   #estimatedBytes = 0;
   #revisionCount = 0;
   readonly #maxThoughts: number;
@@ -67,7 +69,10 @@ export class ThinkingEngine {
     if (stored.branchId) {
       const branch = this.#branches.get(stored.branchId);
       if (branch) branch.push(stored);
-      else this.#branches.set(stored.branchId, [stored]);
+      else {
+        this.#branches.set(stored.branchId, [stored]);
+        this.#branchIdsDirty = true;
+      }
     }
     this.#pruneHistoryIfNeeded();
     const context = this.#buildContextSummary();
@@ -78,10 +83,18 @@ export class ThinkingEngine {
         totalThoughts: stored.totalThoughts,
         nextThoughtNeeded: input.nextThoughtNeeded,
         thoughtHistoryLength: this.#thoughts.length,
-        branches: Array.from(this.#branches.keys()),
+        branches: this.#getBranchIds(),
         context,
       },
     };
+  }
+
+  #getBranchIds(): string[] {
+    if (this.#branchIdsDirty) {
+      this.#branchIdsCache = Array.from(this.#branches.keys());
+      this.#branchIdsDirty = false;
+    }
+    return this.#branchIdsCache;
   }
 
   #buildContextSummary(): ContextSummary {
@@ -107,8 +120,6 @@ export class ThinkingEngine {
       this.#ensureFirstThought(input.thoughtNumber);
       return;
     }
-    if (this.#isRevisionOrBranch(input)) return;
-
     if (this.#isRevisionOrBranch(input)) return;
     this.#warnOnSequenceGap(lastThought, input.thoughtNumber);
   }
@@ -188,6 +199,7 @@ export class ThinkingEngine {
     if (!branch) return;
     if (removeCount >= branch.length) {
       this.#branches.delete(branchId);
+      this.#branchIdsDirty = true;
       return;
     }
     branch.splice(0, removeCount);

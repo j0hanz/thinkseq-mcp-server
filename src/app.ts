@@ -18,9 +18,9 @@ const SERVER_INSTRUCTIONS =
 
 const DEFAULT_PACKAGE_READ_TIMEOUT_MS = 2000;
 
-type Closeable = Record<string, unknown> & {
+interface Closeable extends Record<string, unknown> {
   close?: () => Promise<void> | void;
-};
+}
 
 interface ProcessLike {
   on: (event: string, listener: (...args: unknown[]) => void) => void;
