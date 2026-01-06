@@ -17,22 +17,13 @@ export interface ThinkingEngineOptions {
   estimatedThoughtOverheadBytes?: number;
 }
 
-function normalizeMaxThoughts(value?: number): number {
-  if (typeof value !== 'number' || !Number.isFinite(value)) {
-    return DEFAULT_MAX_THOUGHTS;
-  }
-  const clamped = Math.max(1, Math.min(MAX_THOUGHTS_CAP, Math.trunc(value)));
-  return clamped;
-}
-
-function normalizePositiveInt(
+function normalizeInt(
   value: number | undefined,
-  fallback: number
+  fallback: number,
+  options: { min: number; max: number }
 ): number {
-  if (typeof value !== 'number' || !Number.isFinite(value)) {
-    return fallback;
-  }
-  return Math.max(1, Math.trunc(value));
+  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
+  return Math.max(options.min, Math.min(options.max, Math.trunc(value)));
 }
 
 export class ThinkingEngine {
@@ -44,19 +35,21 @@ export class ThinkingEngine {
   readonly #maxMemoryBytes: number;
   readonly #estimatedThoughtOverheadBytes: number;
 
-  constructor(maxThoughtsOrOptions?: number | ThinkingEngineOptions) {
-    const options =
-      typeof maxThoughtsOrOptions === 'number'
-        ? { maxThoughts: maxThoughtsOrOptions }
-        : (maxThoughtsOrOptions ?? {});
-    this.#maxThoughts = normalizeMaxThoughts(options.maxThoughts);
-    this.#maxMemoryBytes = normalizePositiveInt(
-      options.maxMemoryBytes,
-      MAX_MEMORY_BYTES
+  constructor(options: ThinkingEngineOptions = {}) {
+    this.#maxThoughts = normalizeInt(
+      options.maxThoughts,
+      DEFAULT_MAX_THOUGHTS,
+      { min: 1, max: MAX_THOUGHTS_CAP }
     );
-    this.#estimatedThoughtOverheadBytes = normalizePositiveInt(
+    this.#maxMemoryBytes = normalizeInt(
+      options.maxMemoryBytes,
+      MAX_MEMORY_BYTES,
+      { min: 1, max: Number.MAX_SAFE_INTEGER }
+    );
+    this.#estimatedThoughtOverheadBytes = normalizeInt(
       options.estimatedThoughtOverheadBytes,
-      ESTIMATED_THOUGHT_OVERHEAD_BYTES
+      ESTIMATED_THOUGHT_OVERHEAD_BYTES,
+      { min: 1, max: Number.MAX_SAFE_INTEGER }
     );
   }
 

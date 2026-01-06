@@ -38,29 +38,26 @@ const toolChannel = diagnostics_channel.channel('thinkseq:tool');
 const lifecycleChannel = diagnostics_channel.channel('thinkseq:lifecycle');
 const engineChannel = diagnostics_channel.channel('thinkseq:engine');
 
-export function publishToolEvent(event: ToolEvent): void {
-  if (!toolChannel.hasSubscribers) return;
+function safePublish(
+  channel: diagnostics_channel.Channel,
+  message: unknown
+): void {
+  if (!channel.hasSubscribers) return;
   try {
-    toolChannel.publish(event);
-  } catch (err) {
-    void err;
+    channel.publish(message);
+  } catch {
+    // Intentional suppression of publication errors
   }
+}
+
+export function publishToolEvent(event: ToolEvent): void {
+  safePublish(toolChannel, event);
 }
 
 export function publishLifecycleEvent(event: LifecycleEvent): void {
-  if (!lifecycleChannel.hasSubscribers) return;
-  try {
-    lifecycleChannel.publish(event);
-  } catch (err) {
-    void err;
-  }
+  safePublish(lifecycleChannel, event);
 }
 
 export function publishEngineEvent(event: EngineEvent): void {
-  if (!engineChannel.hasSubscribers) return;
-  try {
-    engineChannel.publish(event);
-  } catch (err) {
-    void err;
-  }
+  safePublish(engineChannel, event);
 }

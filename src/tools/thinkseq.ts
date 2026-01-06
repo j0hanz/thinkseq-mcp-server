@@ -35,28 +35,34 @@ type ToolRegistrar = Pick<McpServer, 'registerTool'>;
 type EngineLike = Pick<ThinkingEngine, 'processThought'>;
 type ThinkSeqInput = z.input<typeof ThinkSeqInputSchema>;
 
-function withOptional<K extends keyof ThoughtData>(
-  target: ThoughtData,
-  key: K,
-  value: ThoughtData[K] | undefined
-): void {
-  if (value === undefined) return;
-  target[key] = value;
+function getContextFields(input: ThinkSeqInput): Partial<ThoughtData> {
+  return {
+    ...(input.isRevision !== undefined && { isRevision: input.isRevision }),
+    ...(input.revisesThought !== undefined && {
+      revisesThought: input.revisesThought,
+    }),
+    ...(input.thoughtType !== undefined && { thoughtType: input.thoughtType }),
+  };
+}
+
+function getBranchFields(input: ThinkSeqInput): Partial<ThoughtData> {
+  return {
+    ...(input.branchFromThought !== undefined && {
+      branchFromThought: input.branchFromThought,
+    }),
+    ...(input.branchId !== undefined && { branchId: input.branchId }),
+  };
 }
 
 function normalizeThoughtInput(input: ThinkSeqInput): ThoughtData {
-  const normalized: ThoughtData = {
+  return {
     thought: input.thought,
     thoughtNumber: input.thoughtNumber,
     totalThoughts: input.totalThoughts,
     nextThoughtNeeded: input.nextThoughtNeeded,
+    ...getContextFields(input),
+    ...getBranchFields(input),
   };
-  withOptional(normalized, 'isRevision', input.isRevision);
-  withOptional(normalized, 'revisesThought', input.revisesThought);
-  withOptional(normalized, 'branchFromThought', input.branchFromThought);
-  withOptional(normalized, 'branchId', input.branchId);
-  withOptional(normalized, 'thoughtType', input.thoughtType);
-  return normalized;
 }
 
 export function registerThinkSeq(

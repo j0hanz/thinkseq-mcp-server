@@ -62,7 +62,8 @@ function createProcessErrorHandler(
   exit: (code: number) => void
 ): (value: unknown) => void {
   return (value: unknown) => {
-    const message = value instanceof Error ? value.message : String(value);
+    const error = value instanceof Error ? value : new Error(String(value));
+    const message = error.message;
     logError(`thinkseq: ${label}: ${message}`);
     exit(1);
   };

@@ -85,7 +85,7 @@ void describe('ThinkingEngine.sequence diagnostics', () => {
 
 void describe('ThinkingEngine.pruning', () => {
   void it('should prune old thoughts when count exceeds max', () => {
-    const engine = new ThinkingEngine(5); // Small limit for testing
+    const engine = new ThinkingEngine({ maxThoughts: 5 }); // Small limit for testing
     const result = processInputs(engine, buildCountPruneInputs());
 
     // Should have pruned to 5 thoughts max
