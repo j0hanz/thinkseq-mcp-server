@@ -42,8 +42,8 @@ export function publishToolEvent(event: ToolEvent): void {
   if (!toolChannel.hasSubscribers) return;
   try {
     toolChannel.publish(event);
-  } catch {
-    // Never throw from diagnostics publish.
+  } catch (err) {
+    void err;
   }
 }
 
@@ -51,8 +51,8 @@ export function publishLifecycleEvent(event: LifecycleEvent): void {
   if (!lifecycleChannel.hasSubscribers) return;
   try {
     lifecycleChannel.publish(event);
-  } catch {
-    // Never throw from diagnostics publish.
+  } catch (err) {
+    void err;
   }
 }
 
@@ -60,7 +60,7 @@ export function publishEngineEvent(event: EngineEvent): void {
   if (!engineChannel.hasSubscribers) return;
   try {
     engineChannel.publish(event);
-  } catch {
-    // Never throw from diagnostics publish.
+  } catch (err) {
+    void err;
   }
 }

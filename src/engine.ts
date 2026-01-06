@@ -8,7 +8,7 @@ import type {
 
 const DEFAULT_MAX_THOUGHTS = 500;
 const MAX_THOUGHTS_CAP = 10000;
-const MAX_MEMORY_BYTES = 100 * 1024 * 1024; // 100MB soft cap
+const MAX_MEMORY_BYTES = 100 * 1024 * 1024;
 const ESTIMATED_THOUGHT_OVERHEAD_BYTES = 200;
 
 export interface ThinkingEngineOptions {
@@ -61,34 +61,22 @@ export class ThinkingEngine {
   processThought(input: ThoughtData): ProcessResult {
     this.validateThoughtNumber(input);
 
-    const stored = this.createStoredThought(input);
-    this.storeThought(stored);
+    const totalThoughts = Math.max(input.totalThoughts, input.thoughtNumber);
+    const stored: StoredThought = {
+      ...input,
+      totalThoughts,
+      timestamp: Date.now(),
+    };
+    this.thoughts.push(stored);
+    if (stored.branchId) {
+      const branch = this.branches.get(stored.branchId) ?? [];
+      branch.push(stored);
+      this.branches.set(stored.branchId, branch);
+    }
 
     this.pruneHistoryIfNeeded();
 
     return this.buildProcessResult(stored, input);
-  }
-
-  private createStoredThought(input: ThoughtData): StoredThought {
-    const totalThoughts = Math.max(input.totalThoughts, input.thoughtNumber);
-    return {
-      ...input,
-      totalThoughts,
-      timestamp: Date.now(),
-      branchPath: this.getBranchPath(input),
-    };
-  }
-
-  private storeThought(stored: StoredThought): void {
-    this.thoughts.push(stored);
-    this.trackBranch(stored);
-  }
-
-  private trackBranch(stored: StoredThought): void {
-    if (!stored.branchId) return;
-    const branch = this.branches.get(stored.branchId) ?? [];
-    branch.push(stored);
-    this.branches.set(stored.branchId, branch);
   }
 
   private buildProcessResult(
@@ -118,7 +106,7 @@ export class ThinkingEngine {
           t.thought.slice(0, 100) + (t.thought.length > 100 ? '...' : ''),
         type: t.thoughtType,
       })),
-      currentBranch: this.getCurrentBranch(),
+      currentBranch: this.thoughts.at(-1)?.branchId,
       hasRevisions: this.thoughts.some((t) => t.isRevision),
     };
   }
@@ -165,7 +153,6 @@ export class ThinkingEngine {
   }
 
   private pruneHistoryIfNeeded(): void {
-    // Count-based pruning
     let pruned = false;
     const excess = this.thoughts.length - this.maxThoughts;
     if (excess > 0) {
@@ -173,13 +160,11 @@ export class ThinkingEngine {
       pruned = true;
     }
 
-    // Memory-aware pruning: estimate current memory usage
     const estimatedBytes = this.thoughts.reduce((sum, t) => {
       return sum + t.thought.length * 2 + this.estimatedThoughtOverheadBytes;
     }, 0);
 
     if (estimatedBytes > this.maxMemoryBytes && this.thoughts.length > 10) {
-      // Prune oldest 20% when over memory threshold
       const toRemove = Math.ceil(this.thoughts.length * 0.2);
       this.thoughts.splice(0, toRemove);
       pruned = true;
@@ -198,13 +183,5 @@ export class ThinkingEngine {
       branch.push(thought);
       this.branches.set(thought.branchId, branch);
     }
-  }
-
-  private getBranchPath(input: ThoughtData): string[] {
-    return input.branchId ? [input.branchId] : [];
-  }
-
-  private getCurrentBranch(): string | undefined {
-    return this.thoughts.at(-1)?.branchId;
   }
 }

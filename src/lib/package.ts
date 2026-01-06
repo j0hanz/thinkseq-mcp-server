@@ -78,7 +78,6 @@ export async function readSelfPackageJson(
   try {
     return await cached;
   } catch (err) {
-    // Clear cache on failure so next call can retry
     cached = undefined;
     throw err;
   }

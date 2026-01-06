@@ -6,7 +6,7 @@ import { publishLifecycleEvent } from './lib/diagnostics.js';
 import type { LifecycleEvent } from './lib/diagnostics.js';
 import type { PackageInfo } from './lib/package.js';
 import { readSelfPackageJson } from './lib/package.js';
-import { registerAllTools } from './tools/index.js';
+import { registerThinkSeq } from './tools/thinkseq.js';
 
 const SERVER_INSTRUCTIONS = `ThinkSeq is a tool for structured, sequential thinking.
 Use it to break down complex problems into steps, with support for branching and revision.
@@ -14,11 +14,11 @@ Each thought builds on previous ones. You can branch to explore alternatives or 
 
 const DEFAULT_PACKAGE_READ_TIMEOUT_MS = 2000;
 
-export interface Closeable {
+interface Closeable {
   close?: () => Promise<void> | void;
 }
 
-export interface ProcessLike {
+interface ProcessLike {
   on: (event: string, listener: (...args: unknown[]) => void) => void;
   exit: (code: number) => void;
 }
@@ -29,7 +29,7 @@ export interface ProcessErrorHandlerDeps {
   exit?: (code: number) => void;
 }
 
-export interface ShutdownDependencies {
+interface ShutdownDependencies {
   processLike?: ProcessLike;
   server: Closeable;
   transport: Closeable;
@@ -44,7 +44,7 @@ export interface RunDependencies {
   publishLifecycleEvent?: (event: LifecycleEvent) => void;
   createServer?: (name: string, version: string) => McpServer;
   connectServer?: (server: McpServer) => Promise<StdioServerTransport>;
-  registerAllTools?: (server: McpServer, engine: ThinkingEngine) => void;
+  registerTool?: (server: McpServer, engine: ThinkingEngine) => void;
   engineFactory?: () => ThinkingEngine;
   installShutdownHandlers?: (deps: ShutdownDependencies) => void;
   now?: () => number;
@@ -57,7 +57,7 @@ interface ResolvedRunDependencies {
   publishLifecycleEvent: (event: LifecycleEvent) => void;
   createServer: (name: string, version: string) => McpServer;
   connectServer: (server: McpServer) => Promise<StdioServerTransport>;
-  registerAllTools: (server: McpServer, engine: ThinkingEngine) => void;
+  registerTool: (server: McpServer, engine: ThinkingEngine) => void;
   engineFactory: () => ThinkingEngine;
   installShutdownHandlers: (deps: ShutdownDependencies) => void;
   now: () => number;
@@ -96,17 +96,7 @@ export function installProcessErrorHandlers(
   );
 }
 
-export function normalizePackageInfo(pkg: PackageInfo): {
-  name: string;
-  version: string;
-} {
-  return {
-    name: pkg.name ?? 'thinkseq',
-    version: pkg.version ?? '0.0.0',
-  };
-}
-
-export function createServer(name: string, version: string): McpServer {
+function createServer(name: string, version: string): McpServer {
   return new McpServer(
     { name, version },
     {
@@ -116,21 +106,33 @@ export function createServer(name: string, version: string): McpServer {
   );
 }
 
-export async function connectServer(
-  server: McpServer
-): Promise<StdioServerTransport> {
+async function connectServer(server: McpServer): Promise<StdioServerTransport> {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   return transport;
 }
 
-export async function tryClose(value: Closeable): Promise<void> {
-  if (typeof value.close === 'function') {
-    await value.close();
+function normalizePackageInfo(pkg: PackageInfo): {
+  name: string;
+  version: string;
+} {
+  return {
+    name: pkg.name ?? 'thinkseq',
+    version: pkg.version ?? '0.0.0',
+  };
+}
+
+async function closeSafely(value: Closeable): Promise<void> {
+  try {
+    if (typeof value.close === 'function') {
+      await value.close();
+    }
+  } catch (err) {
+    void err;
   }
 }
 
-export function installShutdownHandlers({
+function installShutdownHandlers({
   processLike,
   server,
   transport,
@@ -152,16 +154,8 @@ export function installShutdownHandlers({
       signal,
     });
 
-    try {
-      await tryClose(server);
-    } catch {
-      // Never crash on shutdown.
-    }
-    try {
-      await tryClose(transport);
-    } catch {
-      // Never crash on shutdown.
-    }
+    await closeSafely(server);
+    await closeSafely(transport);
     proc.exit(0);
   };
 
@@ -176,42 +170,26 @@ export function installShutdownHandlers({
 function resolveRunDependencies(
   deps: RunDependencies
 ): ResolvedRunDependencies {
-  const processLike = withDefault(deps.processLike, process);
-  const packageReadTimeoutMs = withDefault(
-    deps.packageReadTimeoutMs,
-    DEFAULT_PACKAGE_READ_TIMEOUT_MS
-  );
-  const readPackageJson = withDefault(
-    deps.readPackageJson,
-    readSelfPackageJson
-  );
-  const publishLifecycle = withDefault(
-    deps.publishLifecycleEvent,
-    publishLifecycleEvent
-  );
-  const create = withDefault(deps.createServer, createServer);
-  const connect = withDefault(deps.connectServer, connectServer);
-  const registerTools = withDefault(deps.registerAllTools, registerAllTools);
-  const engineFactory = withDefault(
-    deps.engineFactory,
-    () => new ThinkingEngine()
-  );
-  const installShutdown = withDefault(
-    deps.installShutdownHandlers,
-    installShutdownHandlers
-  );
-  const now = withDefault(deps.now, Date.now);
   return {
-    processLike,
-    packageReadTimeoutMs,
-    readPackageJson,
-    publishLifecycleEvent: publishLifecycle,
-    createServer: create,
-    connectServer: connect,
-    registerAllTools: registerTools,
-    engineFactory,
-    installShutdownHandlers: installShutdown,
-    now,
+    processLike: withDefault(deps.processLike, process),
+    packageReadTimeoutMs: withDefault(
+      deps.packageReadTimeoutMs,
+      DEFAULT_PACKAGE_READ_TIMEOUT_MS
+    ),
+    readPackageJson: withDefault(deps.readPackageJson, readSelfPackageJson),
+    publishLifecycleEvent: withDefault(
+      deps.publishLifecycleEvent,
+      publishLifecycleEvent
+    ),
+    createServer: withDefault(deps.createServer, createServer),
+    connectServer: withDefault(deps.connectServer, connectServer),
+    registerTool: withDefault(deps.registerTool, registerThinkSeq),
+    engineFactory: withDefault(deps.engineFactory, () => new ThinkingEngine()),
+    installShutdownHandlers: withDefault(
+      deps.installShutdownHandlers,
+      installShutdownHandlers
+    ),
+    now: withDefault(deps.now, Date.now),
   };
 }
 
@@ -234,7 +212,7 @@ export async function run(deps: RunDependencies = {}): Promise<void> {
 
   const server = resolved.createServer(name, version);
   const engine = resolved.engineFactory();
-  resolved.registerAllTools(server, engine);
+  resolved.registerTool(server, engine);
 
   const transport = await resolved.connectServer(server);
   resolved.installShutdownHandlers({

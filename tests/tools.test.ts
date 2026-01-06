@@ -9,7 +9,6 @@ import type { ThoughtData } from '../src/lib/types.js';
 import type { ProcessResult } from '../src/lib/types.js';
 import { ThinkSeqInputSchema } from '../src/schemas/inputs.js';
 import { ThinkSeqOutputSchema } from '../src/schemas/outputs.js';
-import { registerAllTools } from '../src/tools/index.js';
 import { registerThinkSeq } from '../src/tools/thinkseq.js';
 
 type StructuredResponse = ProcessResult | ErrorResponse['structuredContent'];
@@ -67,19 +66,6 @@ void describe('tools.registerThinkSeq metadata', () => {
       readOnlyHint: false,
       idempotentHint: false,
     });
-  });
-});
-
-void describe('tools.registerAllTools', () => {
-  void it('delegates to thinkseq', () => {
-    const server = new FakeServer();
-    const engine = {
-      processThought: () => ({ ok: true }),
-    } satisfies Pick<ThinkingEngine, 'processThought'>;
-
-    registerAllTools(server as unknown as McpServer, engine as ThinkingEngine);
-    assert.ok(server.registered);
-    assert.equal(server.registered.name, 'thinkseq');
   });
 });
 

@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 import { installProcessErrorHandlers, run } from './app.js';
 
-// Process error handlers - must be registered early
 installProcessErrorHandlers();
 
 run().catch((err: unknown) => {

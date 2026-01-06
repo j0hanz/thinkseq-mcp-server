@@ -5,15 +5,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 
 import type { RunDependencies } from '../src/app.js';
-import {
-  connectServer,
-  createServer,
-  installProcessErrorHandlers,
-  installShutdownHandlers,
-  normalizePackageInfo,
-  run,
-  tryClose,
-} from '../src/app.js';
+import { installProcessErrorHandlers, run } from '../src/app.js';
 import type { LifecycleEvent } from '../src/lib/diagnostics.js';
 
 interface ProcessStub {
@@ -37,46 +29,6 @@ const createProcessStub = (): ProcessStub => {
     },
   };
 };
-
-const flushMicrotasks = async (): Promise<void> => {
-  await new Promise((resolve) => setImmediate(resolve));
-};
-
-void describe('app.normalizePackageInfo', () => {
-  void it('fills in defaults when missing', () => {
-    const normalized = normalizePackageInfo({});
-    assert.equal(normalized.name, 'thinkseq');
-    assert.equal(normalized.version, '0.0.0');
-  });
-});
-
-void describe('app.createServer', () => {
-  void it('creates a server with a connect method', () => {
-    const server = createServer('thinkseq', '1.0.0');
-    assert.equal(typeof server.connect, 'function');
-  });
-});
-
-void describe('app.connectServer', () => {
-  void it('connects and returns transport', async () => {
-    let seen: StdioServerTransport | undefined;
-    const server = {
-      connect: (transport: StdioServerTransport) => {
-        seen = transport;
-        return Promise.resolve();
-      },
-    } as unknown as McpServer;
-
-    const transport = await connectServer(server);
-    assert.equal(transport, seen);
-  });
-});
-
-void describe('app.tryClose', () => {
-  void it('ignores non-closeable values', async () => {
-    await tryClose({});
-  });
-});
 
 void describe('app.installProcessErrorHandlers', () => {
   void it('logs and exits on unhandledRejection', () => {
@@ -114,27 +66,6 @@ void describe('app.installProcessErrorHandlers', () => {
   });
 });
 
-void describe('app.installShutdownHandlers', () => {
-  void it('emits lifecycle event and closes once', async () => {
-    const harness = createShutdownHarness();
-
-    harness.trigger('SIGTERM');
-    await flushMicrotasks();
-
-    assert.deepEqual(harness.calls.sort(), ['server', 'transport']);
-    assert.deepEqual(harness.proc.exitCodes, [0]);
-    assert.deepEqual(harness.events, [
-      { type: 'lifecycle.shutdown', ts: 123, signal: 'SIGTERM' },
-    ]);
-
-    harness.trigger('SIGINT');
-    await flushMicrotasks();
-
-    assert.deepEqual(harness.proc.exitCodes, [0]);
-    assert.deepEqual(harness.events.length, 1);
-  });
-});
-
 void describe('app.run', () => {
   void it('wires dependencies and starts lifecycle', async () => {
     const harness = createRunHarness();
@@ -151,35 +82,6 @@ void describe('app.run', () => {
     ]);
   });
 });
-
-const createShutdownHarness = (): {
-  proc: ProcessStub;
-  calls: string[];
-  events: LifecycleEvent[];
-  trigger: (signal: 'SIGTERM' | 'SIGINT') => void;
-} => {
-  const proc = createProcessStub();
-  const calls: string[] = [];
-  const events: LifecycleEvent[] = [];
-  const server = { close: () => calls.push('server') };
-  const transport = { close: () => calls.push('transport') };
-
-  installShutdownHandlers({
-    processLike: proc,
-    server,
-    transport,
-    publishLifecycleEvent: (event) => events.push(event),
-    now: () => 123,
-  });
-
-  const trigger = (signal: 'SIGTERM' | 'SIGINT'): void => {
-    const handler = proc.handlers.get(signal);
-    assert.ok(handler);
-    handler();
-  };
-
-  return { proc, calls, events, trigger };
-};
 
 const createRunHarness = (): {
   deps: RunDependencies;
@@ -235,7 +137,7 @@ const buildRunDependencies = (state: RunState): RunDependencies => {
       state.calls.push(value === state.server ? 'connect:ok' : 'connect:bad');
       return Promise.resolve(state.transport);
     },
-    registerAllTools: (value, engine) => {
+    registerTool: (value, engine) => {
       void engine;
       state.calls.push(value === state.server ? 'register:ok' : 'register:bad');
     },

@@ -3,7 +3,6 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { ThinkingEngine } from '../engine.js';
 import { publishToolEvent } from '../lib/diagnostics.js';
 import { createErrorResponse, getErrorMessage } from '../lib/errors.js';
-import { createToolResponse } from '../lib/tool_response.js';
 import type { ThoughtData } from '../lib/types.js';
 import { ThinkSeqInputSchema } from '../schemas/inputs.js';
 import { ThinkSeqOutputSchema } from '../schemas/outputs.js';
@@ -30,36 +29,6 @@ Key parameters:
   },
 };
 
-const createThinkSeqHandler =
-  (engine: ThinkingEngine) => (input: ThoughtData) => {
-    publishToolEvent({
-      type: 'tool.start',
-      tool: 'thinkseq',
-      ts: Date.now(),
-    });
-    try {
-      const result = engine.processThought(input);
-      publishToolEvent({
-        type: 'tool.end',
-        tool: 'thinkseq',
-        ts: Date.now(),
-        ok: true,
-      });
-      return createToolResponse(result);
-    } catch (err) {
-      const errorMessage = getErrorMessage(err);
-      publishToolEvent({
-        type: 'tool.end',
-        tool: 'thinkseq',
-        ts: Date.now(),
-        ok: false,
-        errorCode: 'E_THINK',
-        errorMessage,
-      });
-      return createErrorResponse('E_THINK', errorMessage);
-    }
-  };
-
 export function registerThinkSeq(
   server: McpServer,
   engine: ThinkingEngine
@@ -67,6 +36,36 @@ export function registerThinkSeq(
   server.registerTool(
     'thinkseq',
     THINKSEQ_TOOL_DEFINITION,
-    createThinkSeqHandler(engine)
+    (input: ThoughtData) => {
+      publishToolEvent({
+        type: 'tool.start',
+        tool: 'thinkseq',
+        ts: Date.now(),
+      });
+      try {
+        const result = engine.processThought(input);
+        publishToolEvent({
+          type: 'tool.end',
+          tool: 'thinkseq',
+          ts: Date.now(),
+          ok: true,
+        });
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result) }],
+          structuredContent: result,
+        };
+      } catch (err) {
+        const errorMessage = getErrorMessage(err);
+        publishToolEvent({
+          type: 'tool.end',
+          tool: 'thinkseq',
+          ts: Date.now(),
+          ok: false,
+          errorCode: 'E_THINK',
+          errorMessage,
+        });
+        return createErrorResponse('E_THINK', errorMessage);
+      }
+    }
   );
 }

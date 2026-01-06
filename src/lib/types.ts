@@ -19,7 +19,6 @@ export interface ThoughtData {
 
 export interface StoredThought extends ThoughtData {
   timestamp: number;
-  branchPath: string[];
 }
 
 export interface ContextSummary {
