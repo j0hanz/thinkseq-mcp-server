@@ -1,130 +1,46 @@
-# thinkseq-mcp-server
+# ThinkSeq MCP Server
 
-<img src="docs/logo.png" alt="Filesystem Context MCP Server Logo" width="175">
+<img src="docs/logo.png" alt="ThinkSeq MCP Server Logo" width="175" />
 
 An MCP implementation for advanced reasoning and thinking sequences.
 
 [![npm version](https://img.shields.io/npm/v/@j0hanz/thinkseq-mcp.svg)](https://www.npmjs.com/package/@j0hanz/thinkseq-mcp)
 
-## One-Click Install
+## One-click install
 
 [![Install with NPX in VS Code](https://img.shields.io/badge/VS_Code-Install-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=thinkseq&inputs=%5B%5D&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40j0hanz%2Fthinkseq-mcp%40latest%22%5D%7D) [![Install with NPX in VS Code Insiders](https://img.shields.io/badge/VS_Code_Insiders-Install-24bfa5?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=thinkseq&inputs=%5B%5D&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40j0hanz%2Fthinkseq-mcp%40latest%22%5D%7D&quality=insiders)
 
 [![Install in Cursor](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/install-mcp?name=thinkseq&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkBqMGhhbnovdGhpbmtzZXEtbWNwQGxhdGVzdCJdfQ==)
 
-## ✨ Features
+## Overview
 
-This MCP server provides a powerful `thinkseq` tool that enables AI agents to maintain rigorous thinking sequences.
+ThinkSeq provides a single MCP tool, `thinkseq`, for structured, sequential thinking with branching and revision support. The server runs over stdio and keeps an in-memory history of thoughts so it can return progress, branches, and a short context summary on each call.
 
-| Feature                    | Description                                                                             |
-| :------------------------- | :-------------------------------------------------------------------------------------- |
-| 🧠 **Sequential Thinking** | Break down complex problems into manageable steps with maintained context.              |
-| 🌿 **Branching**           | Explore multiple solution paths simultaneously without losing track of the main thread. |
-| 🔄 **Revision Support**    | Dynamically revise previous thoughts and conclusions based on new insights.             |
-| 🏗️ **Structured Output**   | Returns structured data for better agent-reasoning loops.                               |
-
-## 🎯 When to Use
-
-Use `thinkseq` when the AI agent needs to:
-
-- **Plan complex architectures** before writing code.
-- **Analyze interdependent parameters** or conflicting information.
-- **Debug tricky issues** where initial assumptions might need correction.
-- **Determine feature prioritization** based on multiple constraints.
-- **Structure a "Chain of Thought"** that is visible and reviewable.
-
-## 🚀 Quick Start
-
-The easiest way to use the server is via `npx`:
+## Quick start
 
 ```bash
 npx -y @j0hanz/thinkseq-mcp@latest
 ```
 
-## 📦 Installation
+## MCP client configuration
 
-### NPX (Recommended)
-
-Add this configuration to your MCP client settings:
+Add this to your MCP client settings:
 
 ```json
 {
-  "thinkseq": {
-    "command": "npx",
-    "args": ["-y", "@j0hanz/thinkseq-mcp@latest"]
+  "mcpServers": {
+    "thinkseq": {
+      "command": "npx",
+      "args": ["-y", "@j0hanz/thinkseq-mcp@latest"]
+    }
   }
 }
 ```
 
-### From Source
-
-1. Clone the repository:
-
-   ```bash
-   git clone https://github.com/j0hanz/thinkseq-mcp-server.git
-   cd thinkseq-mcp
-   ```
-
-2. Install dependencies:
-
-   ```bash
-   npm install
-   ```
-
-3. Build the server:
-
-   ```bash
-   npm run build
-   ```
-
-4. Start the server:
-
-   ```bash
-   npm start
-   ```
-
-## ⚙️ Configuration
-
-The server currently does not require environment variables or command-line arguments for basic operation. It runs over stdio by default.
-
-## 🔧 Tools
-
-### `thinkseq`
-
-Structured sequential thinking with branching and revision support.
-
-| Parameter           | Type    | Required | Default | Description                                                               |
-| :------------------ | :------ | :------- | :------ | :------------------------------------------------------------------------ |
-| `thought`           | string  | ✅       | -       | Your current thinking step.                                               |
-| `thoughtNumber`     | number  | ✅       | -       | Current thought number in sequence (starts at 1).                         |
-| `totalThoughts`     | number  | ✅       | -       | Estimated total thoughts needed (can adjust).                             |
-| `nextThoughtNeeded` | boolean | ✅       | -       | Whether another thought step is needed.                                   |
-| `isRevision`        | boolean | ❌       | -       | Whether this revises previous thinking.                                   |
-| `revisesThought`    | number  | ❌       | -       | Which thought number is being reconsidered.                               |
-| `branchFromThought` | number  | ❌       | -       | Branching point thought number.                                           |
-| `branchId`          | string  | ❌       | -       | Branch identifier.                                                        |
-| `thoughtType`       | string  | ❌       | -       | Type: `analysis`, `hypothesis`, `verification`, `revision`, `conclusion`. |
-
-**Returns:** A JSON result containing the processed thought data, which helps the agent maintain context.
-
-**Example Input:**
-
-```json
-{
-  "thought": "I need to break down the user's request into smaller tasks.",
-  "thoughtNumber": 1,
-  "totalThoughts": 3,
-  "nextThoughtNeeded": true,
-  "thoughtType": "analysis"
-}
-```
-
-## 🔌 Client Configuration
-
 <details>
 <summary><b>VS Code</b></summary>
 
-Add to your `mcp.json` (access via command palette: "MCP: Open Settings"):
+Add to your `mcp.json` (command palette: "MCP: Open Settings"):
 
 ```json
 {
@@ -187,7 +103,116 @@ Add to your `~/.codeium/windsurf/mcp_config.json`:
 
 </details>
 
-## 🛠️ Development
+## Tool: `thinkseq`
+
+Structured sequential thinking with branching and revision support.
+
+### Input
+
+| Field               | Type    | Required | Description                                                                |
+| :------------------ | :------ | :------: | :------------------------------------------------------------------------- |
+| `thought`           | string  |   yes    | Current thinking step (1 to 50000 chars).                                  |
+| `thoughtNumber`     | number  |   yes    | Current thought number in sequence (1 to 10000).                           |
+| `totalThoughts`     | number  |   yes    | Estimated total thoughts needed (1 to 10000).                              |
+| `nextThoughtNeeded` | boolean |   yes    | Whether another thought step is needed.                                    |
+| `isRevision`        | boolean |    no    | Marks this thought as a revision.                                          |
+| `revisesThought`    | number  |    no    | Thought number being revised (must exist).                                 |
+| `branchFromThought` | number  |    no    | Thought number to branch from (must exist).                                |
+| `branchId`          | string  |    no    | Branch identifier (1 to 100 chars).                                        |
+| `thoughtType`       | enum    |    no    | One of `analysis`, `hypothesis`, `verification`, `revision`, `conclusion`. |
+
+### Output
+
+The tool returns JSON with a success or error shape:
+
+- Success: `{ ok: true, result: { ... } }`
+- Error: `{ ok: false, error: { code, message } }`
+
+Result fields:
+
+| Field                  | Type     | Description                                          |
+| :--------------------- | :------- | :--------------------------------------------------- |
+| `thoughtNumber`        | number   | Stored thought number.                               |
+| `totalThoughts`        | number   | Effective total thoughts (at least `thoughtNumber`). |
+| `progress`             | number   | `thoughtNumber / totalThoughts` (0 to 1).            |
+| `nextThoughtNeeded`    | boolean  | Mirrors input.                                       |
+| `thoughtHistoryLength` | number   | Stored thought count after pruning.                  |
+| `branches`             | string[] | Known branch IDs.                                    |
+| `context`              | object   | Recent context summary (see below).                  |
+
+Context fields:
+
+| Field            | Type    | Description                                                              |
+| :--------------- | :------ | :----------------------------------------------------------------------- |
+| `recentThoughts` | array   | Up to the last 5 thoughts with `number`, `preview`, and optional `type`. |
+| `currentBranch`  | string  | Latest thought branch ID (if any).                                       |
+| `hasRevisions`   | boolean | Whether any revision has been recorded.                                  |
+
+### Example
+
+Input:
+
+```json
+{
+  "thought": "Break down the problem into steps.",
+  "thoughtNumber": 1,
+  "totalThoughts": 3,
+  "nextThoughtNeeded": true,
+  "thoughtType": "analysis"
+}
+```
+
+Output (success):
+
+```json
+{
+  "ok": true,
+  "result": {
+    "thoughtNumber": 1,
+    "totalThoughts": 3,
+    "progress": 0.3333333333333333,
+    "nextThoughtNeeded": true,
+    "thoughtHistoryLength": 1,
+    "branches": [],
+    "context": {
+      "recentThoughts": [
+        {
+          "number": 1,
+          "preview": "Break down the problem into steps.",
+          "type": "analysis"
+        }
+      ],
+      "hasRevisions": false
+    }
+  }
+}
+```
+
+## Behavior and validation
+
+- Inputs are validated with Zod and unknown keys are rejected.
+- The first thought must have `thoughtNumber` 1.
+- `revisesThought` and `branchFromThought` must reference an existing thought number.
+- Gaps in thought sequence are allowed but emit a diagnostics event.
+- `totalThoughts` is adjusted up to at least `thoughtNumber`.
+- The engine stores thoughts in memory and prunes when limits are exceeded:
+  - `maxThoughts` default: 500 (cap 10000)
+  - `maxMemoryBytes` default: 100 MB
+  - `estimatedThoughtOverheadBytes` default: 200
+
+## Diagnostics
+
+This server publishes events via `node:diagnostics_channel`:
+
+- `thinkseq:tool` for `tool.start` and `tool.end` events
+- `thinkseq:lifecycle` for `lifecycle.started` and `lifecycle.shutdown`
+- `thinkseq:engine` for `engine.sequence_gap`
+
+## Configuration
+
+No environment variables or CLI flags are required for basic operation. The server runs over stdio and enforces MCP initialization order and protocol version checks.
+
+## Development
 
 ### Prerequisites
 
@@ -195,26 +220,38 @@ Add to your `~/.codeium/windsurf/mcp_config.json`:
 
 ### Scripts
 
-| Command             | Description                                         |
-| :------------------ | :-------------------------------------------------- |
-| `npm run build`     | Compiles TypeScript to `dist/`.                     |
-| `npm run dev`       | Runs the server in watch mode for development.      |
-| `npm run test`      | Runs the test suite.                                |
-| `npm run lint`      | Lints the codebase using ESLint.                    |
-| `npm run inspector` | Launches the MCP Inspector for interactive testing. |
+| Command                  | Description                                                 |
+| :----------------------- | :---------------------------------------------------------- |
+| `npm run build`          | Compile TypeScript to `dist/`.                              |
+| `npm run dev`            | Run the server in watch mode.                               |
+| `npm start`              | Run `dist/index.js`.                                        |
+| `npm run test`           | Run the test suite.                                         |
+| `npm run test:coverage`  | Run tests with coverage output.                             |
+| `npm run lint`           | Lint with ESLint.                                           |
+| `npm run format`         | Format with Prettier.                                       |
+| `npm run format:check`   | Check formatting with Prettier.                             |
+| `npm run type-check`     | Type-check without emitting.                                |
+| `npm run inspector`      | Launch the MCP inspector.                                   |
+| `npm run clean`          | Remove `dist/`.                                             |
+| `npm run prepublishOnly` | Lint, type-check, and build.                                |
+| `npm run benchmark`      | Run `benchmark/engine.bench.ts` (add the file to use this). |
 
-### Project Structure
+### Project structure
 
 ```text
 src/
-├── app.ts          # Application setup
-├── engine.ts       # Core thinking engine logic
-├── index.ts        # Entry point
-├── lib/            # Shared utilities
-├── schemas/        # Zod input/output schemas
-└── tools/          # Tool definitions (thinkseq.ts)
+  app.ts        # Application setup and MCP wiring
+  engine.ts     # Core thinking engine
+  index.ts      # Entry point
+  lib/          # Diagnostics, package, error, protocol, stdio utilities
+  schemas/      # Zod input/output schemas
+  tools/        # Tool definitions (thinkseq)
+tests/          # Node.js tests
+benchmark/      # Benchmark targets (currently empty)
+docs/           # Assets (logo)
+dist/           # Build output
 ```
 
-## 🤝 Contributing
+## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions are welcome. Please open a pull request with a clear description and include relevant tests.

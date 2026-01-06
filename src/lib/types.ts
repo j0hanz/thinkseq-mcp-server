@@ -37,6 +37,7 @@ export type ProcessResult =
       result: {
         thoughtNumber: number;
         totalThoughts: number;
+        progress: number;
         nextThoughtNeeded: boolean;
         thoughtHistoryLength: number;
         branches: readonly string[];

@@ -9,6 +9,7 @@ const OK_TRUE_OUTPUT = {
   result: {
     thoughtNumber: 1,
     totalThoughts: 2,
+    progress: 0.5,
     nextThoughtNeeded: true,
     thoughtHistoryLength: 1,
     branches: [],

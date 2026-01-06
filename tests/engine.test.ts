@@ -23,6 +23,48 @@ void describe('ThinkingEngine.basic', () => {
   });
 });
 
+void describe('ThinkingEngine.progress', () => {
+  void it('should calculate progress correctly', () => {
+    const engine = new ThinkingEngine();
+
+    const result1 = engine.processThought({
+      thought: 'Step 1',
+      thoughtNumber: 1,
+      totalThoughts: 4,
+      nextThoughtNeeded: true,
+    });
+    assert.ok(result1.ok);
+    assert.strictEqual(result1.result.progress, 0.25);
+
+    const result2 = engine.processThought({
+      thought: 'Step 2',
+      thoughtNumber: 2,
+      totalThoughts: 4,
+      nextThoughtNeeded: true,
+    });
+    assert.ok(result2.ok);
+    assert.strictEqual(result2.result.progress, 0.5);
+
+    const result4 = engine.processThought({
+      thought: 'Step 3',
+      thoughtNumber: 3,
+      totalThoughts: 4,
+      nextThoughtNeeded: true,
+    });
+    assert.ok(result4.ok);
+    assert.strictEqual(result4.result.progress, 0.75);
+
+    const resultFinal = engine.processThought({
+      thought: 'Final step',
+      thoughtNumber: 4,
+      totalThoughts: 4,
+      nextThoughtNeeded: false,
+    });
+    assert.ok(resultFinal.ok);
+    assert.strictEqual(resultFinal.result.progress, 1);
+  });
+});
+
 void describe('ThinkingEngine.sequence', () => {
   void it('should validate sequence order', () => {
     const engine = new ThinkingEngine();

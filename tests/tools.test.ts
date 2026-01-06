@@ -51,6 +51,7 @@ void describe('tools.registerThinkSeq metadata', () => {
         result: {
           thoughtNumber: 1,
           totalThoughts: 1,
+          progress: 1,
           nextThoughtNeeded: false,
           thoughtHistoryLength: 1,
           branches: [],
@@ -80,6 +81,7 @@ void describe('tools.registerThinkSeq handler success', () => {
         result: {
           thoughtNumber: input.thoughtNumber,
           totalThoughts: input.totalThoughts,
+          progress: input.thoughtNumber / input.totalThoughts,
           nextThoughtNeeded: input.nextThoughtNeeded,
           thoughtHistoryLength: 1,
           branches: [],

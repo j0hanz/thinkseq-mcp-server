@@ -82,6 +82,7 @@ export class ThinkingEngine {
       result: {
         thoughtNumber: stored.thoughtNumber,
         totalThoughts: stored.totalThoughts,
+        progress: Math.min(1, stored.thoughtNumber / stored.totalThoughts),
         nextThoughtNeeded: input.nextThoughtNeeded,
         thoughtHistoryLength: this.#thoughts.length,
         branches: this.#getBranchIds(),

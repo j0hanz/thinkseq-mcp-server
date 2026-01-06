@@ -25,6 +25,7 @@ const ContextSchema = z.strictObject({
 const ResultSchema = z.strictObject({
   thoughtNumber: z.number(),
   totalThoughts: z.number(),
+  progress: z.number().min(0).max(1),
   nextThoughtNeeded: z.boolean(),
   thoughtHistoryLength: z.number(),
   branches: z.array(z.string()),
