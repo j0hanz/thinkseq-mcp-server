@@ -6,6 +6,11 @@ import { publishLifecycleEvent } from './lib/diagnostics.js';
 import type { LifecycleEvent } from './lib/diagnostics.js';
 import type { PackageInfo } from './lib/package.js';
 import { readSelfPackageJson } from './lib/package.js';
+import { installInitializationGuards } from './lib/protocolGuards.js';
+import {
+  installStdioInvalidMessageGuards,
+  installStdioParseErrorResponder,
+} from './lib/stdioGuards.js';
 import { registerThinkSeq } from './tools/thinkseq.js';
 
 const SERVER_INSTRUCTIONS = `ThinkSeq is a tool for structured, sequential thinking.
@@ -103,6 +108,8 @@ function createServer(name: string, version: string): ServerLike {
 async function connectServer(server: ServerLike): Promise<TransportLike> {
   const transport = new StdioServerTransport();
   await server.connect(transport);
+  installStdioInvalidMessageGuards(transport);
+  installStdioParseErrorResponder(transport);
   return transport;
 }
 
@@ -196,6 +203,7 @@ export async function run(deps: RunDependencies = {}): Promise<void> {
   const server = resolved.createServer(name, version);
   const engine = resolved.engineFactory();
   resolved.registerTool(server, engine);
+  installInitializationGuards(server);
 
   const transport = await resolved.connectServer(server);
   resolved.installShutdownHandlers({
