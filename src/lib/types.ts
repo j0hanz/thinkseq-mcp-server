@@ -22,7 +22,7 @@ export interface StoredThought extends ThoughtData {
 }
 
 export interface ContextSummary {
-  recentThoughts: {
+  recentThoughts: readonly {
     number: number;
     preview: string;
     type?: ThoughtType;
@@ -39,7 +39,7 @@ export type ProcessResult =
         totalThoughts: number;
         nextThoughtNeeded: boolean;
         thoughtHistoryLength: number;
-        branches: string[];
+        branches: readonly string[];
         context: ContextSummary;
       };
       error?: never;
