@@ -8,18 +8,15 @@ type RequestHandler = (request: unknown, extra: unknown) => unknown;
 
 const INIT_FIRST_ERROR_MESSAGE = 'initialize must be the first request';
 
-interface ProtocolLike {
-  _requestHandlers?: unknown;
-  fallbackRequestHandler?: unknown;
-}
-
 function isRequestHandler(value: unknown): value is RequestHandler {
   return typeof value === 'function';
 }
 
 function getInitializeProtocolVersion(request: unknown): unknown {
-  return (request as { params?: { protocolVersion?: unknown } } | undefined)
-    ?.params?.protocolVersion;
+  if (!request || typeof request !== 'object') return undefined;
+  const params: unknown = Reflect.get(request, 'params');
+  if (!params || typeof params !== 'object') return undefined;
+  return Reflect.get(params, 'protocolVersion');
 }
 
 function assertSupportedProtocolVersion(protocolVersion: unknown): void {
@@ -52,49 +49,58 @@ function wrapWithInitializationGuard(
   };
 }
 
-function getProtocol(server: unknown): ProtocolLike | undefined {
-  return (server as { server?: unknown } | undefined)?.server as
-    | ProtocolLike
-    | undefined;
+function getProtocolObject(server: unknown): object | undefined {
+  if (!server || typeof server !== 'object') return undefined;
+  const protocol: unknown = Reflect.get(server, 'server');
+  return protocol && typeof protocol === 'object' ? protocol : undefined;
 }
 
 function getRequestHandlers(
-  protocol: ProtocolLike
-): Map<string, unknown> | undefined {
-  const handlers = protocol._requestHandlers;
-  return handlers instanceof Map
-    ? (handlers as Map<string, unknown>)
-    : undefined;
+  protocol: object
+): Map<unknown, unknown> | undefined {
+  const handlers: unknown = Reflect.get(protocol, '_requestHandlers');
+  return handlers instanceof Map ? handlers : undefined;
 }
 
 function installFallbackRequestHandler(
-  protocol: ProtocolLike,
+  protocol: object,
   state: { sawInitialize: boolean }
 ): void {
   // Guard unknown methods as well (so pre-init calls to unknown methods don't
   // fall through to MethodNotFound).
-  protocol.fallbackRequestHandler = (request: { method?: unknown }) => {
-    const method = request.method;
+  const handler = (request: unknown): never => {
+    const method: unknown =
+      request && typeof request === 'object'
+        ? Reflect.get(request, 'method')
+        : undefined;
     if (!state.sawInitialize && method !== 'initialize') {
       throw new McpError(ErrorCode.InvalidRequest, INIT_FIRST_ERROR_MESSAGE);
     }
     throw new McpError(ErrorCode.MethodNotFound, 'Method not found');
   };
+
+  Reflect.set(protocol, 'fallbackRequestHandler', handler);
+}
+
+function wrapRequestHandlers(
+  handlers: Map<unknown, unknown>,
+  state: { sawInitialize: boolean }
+): void {
+  for (const [method, handler] of handlers.entries()) {
+    if (typeof method !== 'string') continue;
+    if (!isRequestHandler(handler)) continue;
+    handlers.set(method, wrapWithInitializationGuard(method, handler, state));
+  }
 }
 
 export function installInitializationGuards(server: unknown): void {
-  const protocol = getProtocol(server);
+  const protocol = getProtocolObject(server);
   if (!protocol) return;
-
   const handlers = getRequestHandlers(protocol);
   if (!handlers) return;
 
   const state = { sawInitialize: false };
 
-  for (const [method, handler] of handlers.entries()) {
-    if (!isRequestHandler(handler)) continue;
-    handlers.set(method, wrapWithInitializationGuard(method, handler, state));
-  }
-
+  wrapRequestHandlers(handlers, state);
   installFallbackRequestHandler(protocol, state);
 }

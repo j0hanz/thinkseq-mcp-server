@@ -10,10 +10,10 @@ function isStdioMessageTransport(
   value: unknown
 ): value is StdioMessageTransportLike {
   if (!value || typeof value !== 'object') return false;
-  const transport = value as StdioMessageTransportLike;
+  const transport = value;
   return (
-    typeof transport.onmessage === 'function' &&
-    typeof transport.send === 'function'
+    typeof Reflect.get(transport, 'onmessage') === 'function' &&
+    typeof Reflect.get(transport, 'send') === 'function'
   );
 }
 

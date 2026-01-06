@@ -25,10 +25,6 @@ Key parameters:
 - nextThoughtNeeded: false only when done`,
   inputSchema: ThinkSeqInputSchema,
   outputSchema: ThinkSeqOutputSchema,
-  annotations: {
-    readOnlyHint: false,
-    idempotentHint: false,
-  },
 };
 
 type ToolRegistrar = Pick<McpServer, 'registerTool'>;

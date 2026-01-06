@@ -59,7 +59,7 @@ void describe('tools.registerThinkSeq metadata', () => {
       }),
     } satisfies Pick<ThinkingEngine, 'processThought'>;
 
-    registerThinkSeq(server as unknown as McpServer, engine as ThinkingEngine);
+    registerThinkSeq(server as unknown as McpServer, engine);
 
     assert.ok(server.registered);
     assert.equal(server.registered.name, 'thinkseq');
@@ -68,10 +68,6 @@ void describe('tools.registerThinkSeq metadata', () => {
     assert.equal(definition.title, 'Think Sequentially');
     assert.equal(definition.inputSchema, ThinkSeqInputSchema);
     assert.equal(definition.outputSchema, ThinkSeqOutputSchema);
-    assert.deepEqual(definition.annotations, {
-      readOnlyHint: false,
-      idempotentHint: false,
-    });
   });
 });
 
@@ -92,7 +88,7 @@ void describe('tools.registerThinkSeq handler success', () => {
       }),
     };
 
-    registerThinkSeq(server as unknown as McpServer, engine as ThinkingEngine);
+    registerThinkSeq(server as unknown as McpServer, engine);
     assert.ok(server.registered);
 
     const input = createThoughtInput();
@@ -114,7 +110,7 @@ void describe('tools.registerThinkSeq handler error', () => {
       },
     };
 
-    registerThinkSeq(server as unknown as McpServer, engine as ThinkingEngine);
+    registerThinkSeq(server as unknown as McpServer, engine);
     assert.ok(server.registered);
 
     const input = createThoughtInput();

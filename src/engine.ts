@@ -55,7 +55,6 @@ export class ThinkingEngine {
 
   processThought(input: ThoughtData): ProcessResult {
     this.#validateThoughtNumber(input);
-
     const totalThoughts = Math.max(input.totalThoughts, input.thoughtNumber);
     const stored: StoredThought = {
       ...input,
@@ -63,18 +62,14 @@ export class ThinkingEngine {
       timestamp: Date.now(),
     };
     this.#thoughts.push(stored);
-    this.#recordThoughtMetrics(stored);
-    this.#recordBranch(stored);
-
+    this.#estimatedBytes += this.#estimateThoughtBytes(stored);
+    if (stored.isRevision) this.#revisionCount += 1;
+    if (stored.branchId) {
+      const branch = this.#branches.get(stored.branchId);
+      if (branch) branch.push(stored);
+      else this.#branches.set(stored.branchId, [stored]);
+    }
     this.#pruneHistoryIfNeeded();
-
-    return this.#buildProcessResult(stored, input);
-  }
-
-  #buildProcessResult(
-    stored: StoredThought,
-    input: ThoughtData
-  ): ProcessResult {
     const context = this.#buildContextSummary();
     return {
       ok: true,
@@ -108,16 +103,13 @@ export class ThinkingEngine {
 
   #validateThoughtNumber(input: ThoughtData): void {
     const lastThought = this.#thoughts.at(-1);
-
     if (!lastThought) {
       this.#ensureFirstThought(input.thoughtNumber);
       return;
     }
+    if (this.#isRevisionOrBranch(input)) return;
 
-    if (this.#isRevisionOrBranch(input)) {
-      return;
-    }
-
+    if (this.#isRevisionOrBranch(input)) return;
     this.#warnOnSequenceGap(lastThought, input.thoughtNumber);
   }
 
@@ -129,9 +121,7 @@ export class ThinkingEngine {
   }
 
   #isRevisionOrBranch(input: ThoughtData): boolean {
-    const isRevision = input.isRevision === true;
-    const isBranch = input.branchFromThought !== undefined;
-    return isRevision || isBranch;
+    return input.isRevision === true || input.branchFromThought !== undefined;
   }
 
   #warnOnSequenceGap(lastThought: StoredThought, thoughtNumber: number): void {
@@ -164,74 +154,42 @@ export class ThinkingEngine {
     return thought.thought.length * 2 + this.#estimatedThoughtOverheadBytes;
   }
 
-  #recordThoughtMetrics(thought: StoredThought): void {
-    this.#estimatedBytes += this.#estimateThoughtBytes(thought);
-    if (thought.isRevision) {
-      this.#revisionCount += 1;
-    }
-  }
-
-  #recordBranch(thought: StoredThought): void {
-    if (!thought.branchId) return;
-    const branch = this.#branches.get(thought.branchId);
-    if (branch) {
-      branch.push(thought);
-      return;
-    }
-    this.#branches.set(thought.branchId, [thought]);
-  }
-
   #removeOldest(count: number): void {
     if (count <= 0 || this.#thoughts.length === 0) return;
     const actual = Math.min(count, this.#thoughts.length);
     const removed = this.#thoughts.splice(0, actual);
+    if (removed.length === 0) return;
     this.#applyRemoval(removed);
   }
 
   #applyRemoval(removed: StoredThought[]): void {
-    if (removed.length === 0) return;
     const branchRemovals = this.#collectBranchRemovals(removed);
-    this.#applyBranchRemovals(branchRemovals);
+    for (const [branchId, removeCount] of branchRemovals) {
+      this.#trimBranch(branchId, removeCount);
+    }
   }
 
   #collectBranchRemovals(removed: StoredThought[]): Map<string, number> {
     const branchRemovals = new Map<string, number>();
     for (const thought of removed) {
-      this.#applyMetricRemoval(thought);
-      this.#recordBranchRemoval(branchRemovals, thought.branchId);
+      this.#estimatedBytes -= this.#estimateThoughtBytes(thought);
+      if (thought.isRevision) this.#revisionCount -= 1;
+      if (!thought.branchId) continue;
+      branchRemovals.set(
+        thought.branchId,
+        (branchRemovals.get(thought.branchId) ?? 0) + 1
+      );
     }
     return branchRemovals;
   }
 
-  #applyMetricRemoval(thought: StoredThought): void {
-    this.#estimatedBytes -= this.#estimateThoughtBytes(thought);
-    if (thought.isRevision) {
-      this.#revisionCount -= 1;
-    }
-  }
-
-  #recordBranchRemoval(
-    branchRemovals: Map<string, number>,
-    branchId?: string
-  ): void {
-    if (!branchId) return;
-    const current = branchRemovals.get(branchId) ?? 0;
-    branchRemovals.set(branchId, current + 1);
-  }
-
-  #applyBranchRemovals(branchRemovals: Map<string, number>): void {
-    for (const [branchId, count] of branchRemovals) {
-      this.#trimBranch(branchId, count);
-    }
-  }
-
-  #trimBranch(branchId: string, count: number): void {
+  #trimBranch(branchId: string, removeCount: number): void {
     const branch = this.#branches.get(branchId);
     if (!branch) return;
-    if (count >= branch.length) {
+    if (removeCount >= branch.length) {
       this.#branches.delete(branchId);
       return;
     }
-    branch.splice(0, count);
+    branch.splice(0, removeCount);
   }
 }

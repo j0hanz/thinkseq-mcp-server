@@ -13,9 +13,8 @@ import {
 } from './lib/stdioGuards.js';
 import { registerThinkSeq } from './tools/thinkseq.js';
 
-const SERVER_INSTRUCTIONS = `ThinkSeq is a tool for structured, sequential thinking.
-Use it to break down complex problems into steps, with support for branching and revision.
-Each thought builds on previous ones. You can branch to explore alternatives or revise earlier thinking.`;
+const SERVER_INSTRUCTIONS =
+  'ThinkSeq is a tool for structured, sequential thinking with branching and revision support.';
 
 const DEFAULT_PACKAGE_READ_TIMEOUT_MS = 2000;
 
@@ -61,19 +60,6 @@ export interface RunDependencies {
 
 type ResolvedRunDependencies = Required<RunDependencies>;
 
-function createProcessErrorHandler(
-  label: 'unhandledRejection' | 'uncaughtException',
-  logError: (message: string) => void,
-  exit: (code: number) => void
-): (value: unknown) => void {
-  return (value: unknown) => {
-    const error = value instanceof Error ? value : new Error(String(value));
-    const message = error.message;
-    logError(`thinkseq: ${label}: ${message}`);
-    exit(1);
-  };
-}
-
 export function installProcessErrorHandlers(
   deps: ProcessErrorHandlerDeps = {}
 ): void {
@@ -85,14 +71,15 @@ export function installProcessErrorHandlers(
       proc.exit(code);
     });
 
-  proc.on(
-    'unhandledRejection',
-    createProcessErrorHandler('unhandledRejection', logError, exit)
-  );
-  proc.on(
-    'uncaughtException',
-    createProcessErrorHandler('uncaughtException', logError, exit)
-  );
+  const handlerFor =
+    (label: 'unhandledRejection' | 'uncaughtException') => (value: unknown) => {
+      const error = value instanceof Error ? value : new Error(String(value));
+      logError(`thinkseq: ${label}: ${error.message}`);
+      exit(1);
+    };
+
+  proc.on('unhandledRejection', handlerFor('unhandledRejection'));
+  proc.on('uncaughtException', handlerFor('uncaughtException'));
 }
 
 function createServer(name: string, version: string): ServerLike {
@@ -113,16 +100,6 @@ async function connectServer(server: ServerLike): Promise<TransportLike> {
   return transport;
 }
 
-function normalizePackageInfo(pkg: PackageInfo): {
-  name: string;
-  version: string;
-} {
-  return {
-    name: pkg.name ?? 'thinkseq',
-    version: pkg.version ?? '0.0.0',
-  };
-}
-
 const DEFAULT_RUN_DEPENDENCIES: ResolvedRunDependencies = {
   processLike: process,
   packageReadTimeoutMs: DEFAULT_PACKAGE_READ_TIMEOUT_MS,
@@ -136,19 +113,13 @@ const DEFAULT_RUN_DEPENDENCIES: ResolvedRunDependencies = {
   now: Date.now,
 };
 
-function resolveRunDependencies(
-  deps: RunDependencies
-): ResolvedRunDependencies {
-  return { ...DEFAULT_RUN_DEPENDENCIES, ...deps };
-}
-
 async function closeSafely(value: Closeable): Promise<void> {
   try {
     if (typeof value.close === 'function') {
       await value.close();
     }
-  } catch (err) {
-    void err;
+  } catch {
+    return;
   }
 }
 
@@ -188,12 +159,16 @@ function installShutdownHandlers({
 }
 
 export async function run(deps: RunDependencies = {}): Promise<void> {
-  const resolved = resolveRunDependencies(deps);
+  const resolved: ResolvedRunDependencies = {
+    ...DEFAULT_RUN_DEPENDENCIES,
+    ...deps,
+  };
 
   const pkg = await resolved.readPackageJson(
     AbortSignal.timeout(resolved.packageReadTimeoutMs)
   );
-  const { name, version } = normalizePackageInfo(pkg);
+  const name = pkg.name ?? 'thinkseq';
+  const version = pkg.version ?? '0.0.0';
 
   resolved.publishLifecycleEvent({
     type: 'lifecycle.started',
