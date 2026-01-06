@@ -1,6 +1,6 @@
 {
   "name": "@j0hanz/thinkseq-mcp",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "mcpName": "io.github.j0hanz/thinkseq",
   "description": "An MCP implementation for advanced reasoning and thinking sequences.",
   "type": "module",
