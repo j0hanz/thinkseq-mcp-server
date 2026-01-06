@@ -2,73 +2,64 @@
 
 ## Project Overview
 
-- **ThinkSeq MCP Server**: An MCP implementation for advanced reasoning and thinking sequences, effectively enabling "Chain of Thought" with branching and revision capabilities for AI agents.
-- **Tech Stack**:
-  - Node.js (>=20.0.0)
-  - TypeScript (ES2022 / NodeNext)
-  - @modelcontextprotocol/sdk
+- **Goal**: Provides an MCP server (`thinkseq`) for structured, sequential thinking with branching and revision support.
+- **Stack**: Node.js (>=20), TypeScript (ES2022/NodeNext), MCP SDK, Zod, native Node test runner.
 
 ## Repo Map / Structure
 
 - `src/`: Source code
-  - `engine.ts`: Core thinking engine logic
-  - `tools/`: Tool definitions (e.g., `thinkseq.ts`)
-  - `schemas/`: Zod validation schemas (`inputs.ts`, `outputs.ts`)
-  - `lib/`: Shared utilities (diagnostics, package info, types)
-- `tests/`: Native Node.js tests (`*.test.ts`)
-- `dist/`: Compiled JavaScript output (generated)
-- `docs/`: Logo and documentation assets
+  - `app.ts`: MCP server application setup and wiring.
+  - `engine.ts`: Core thinking engine logic (in-memory state management).
+  - `index.ts`: Application entry point.
+  - `lib/`: Shared utilities (diagnostics, protocol guards, stdio guards).
+  - `schemas/`: Zod schemas for validation inputs/outputs.
+  - `tools/`: Tool definitions (specifically `thinkseq.ts`).
+- `tests/`: Unit tests matching source structure (e.g., `engine.test.ts`).
+- `benchmark/`: Performance benchmark scripts.
+- `dist/`: Compiled JavaScript output (generated).
+- `docs/`: Documentation assets and deep dives.
 
 ## Setup & Environment
 
-- **Prerequisites**: Node.js >=20.0.0
-- **Install Dependencies**: `npm install`
-- **Environment config**: No strict `.env` required; configuration is handled via MCP initialization arguments if needed.
+- **Install dependencies**: `npm install`
+- **Engine requirement**: Node.js >= 20.0.0
+- **Configuration**: Zero-config; runs over stdio. No `.env` required for basic operation.
 
 ## Development Workflow
 
-- **Dev Mode** (Watch): `npm run dev`
-  - Runs `tsx watch src/index.ts`
-- **Build**: `npm run build`
-  - Runs `tsc` (outputs to `dist/`)
-- **Start**: `npm start`
-  - Runs `node dist/index.js`
-- **MCP Inspector**: `npm run inspector`
-  - Launches `@modelcontextprotocol/inspector` for interactive testing.
+- **Dev mode**: `npm run dev` (runs `src/index.ts` with `tsx` in watch mode)
+- **type-check**: `npm run type-check` (runs `tsc` without emitting files)
+- **Start production**: `npm start` (runs `dist/index.js`)
+- **Inspector**: `npm run inspector` (launches MCP inspector)
 
 ## Testing
 
-- **Run All Tests**: `npm test`
-  - Uses `node --test` with `tsx/esm` loader.
-- **Coverage**: `npm run test:coverage`
-  - Includes experimental test coverage.
-- **Test Locations**: `tests/*.test.ts`
+- **Run all tests**: `npm test` (uses Node.js native test runner)
+- **Run with coverage**: `npm run test:coverage`
+- **Benchmarks**: `npm run benchmark`
+- **Test location**: Files ending in `.test.ts` inside `tests/`.
 
 ## Code Style & Conventions
 
-- **Language**: TypeScript (Strict mode, ES2022)
-- **Linting**: `npm run lint`
-  - Uses `eslint` with `typescript-eslint` (strict + stylistic).
-- **Formatting**: `npm run format`
-  - Uses `prettier`.
-- **Imports**: `type-imports` are enforced.
-- **Rules**:
-  - No `any` (`@typescript-eslint/no-explicit-any`)
-  - Explicit function return types required.
-  - No floating promises.
+- **Language**: TypeScript (Target ES2022, Module NodeNext).
+- **Lint**: `npm run lint` (ESLint 9).
+- **Format**: `npm run format` (Prettier).
+- **Check format**: `npm run format:check`.
+- **Imports**: Uses `tsx` for execution during dev/test. Explicit extensions required in imports where applicable due to `NodeNext`.
 
 ## Build / Release
 
-- **Build Output**: `dist/` cleaned and regenerated on build.
-- **Pre-publish**: `npm run prepublishOnly`
-  - Automatically runs lint, type-check, and build.
+- **Build command**: `npm run build` (runs `tsc`).
+- **Clean**: `npm run clean` (removes `dist/`).
+- **Output directory**: `dist/` contains the compiled JS and type definitions.
+- **Pre-publish**: `npm run prepublishOnly` ensures lint, type-check, and clean build before publishing.
 
 ## Security & Safety
 
-- **Clean Scripts**: `npm run clean` uses strictly scoped deletion of `dist/`.
-- **Input Validation**: All tool inputs are validated via `zod` schemas in `src/schemas/`.
+- **Stdio Isolation**: Server runs strictly over stdio; no external network ports opened by default.
+- **Input Validation**: All tool inputs strictly validated via Zod schemas (`src/schemas/inputs.ts`).
 
 ## Pull Request / Commit Guidelines
 
-- **Recommended Checks**: Run `npm run lint && npm run type-check && npm run build` before pushing.
-- **Conventional Commits**: No strict enforcement found, but `clean`, `build`, `test` scripts imply standard workflows.
+- **Validation**: Ensure `npm run lint`, `npm run type-check`, and `npm test` pass before committing.
+- **Cleanliness**: Run `npm run format` to ensure code style compliance.
