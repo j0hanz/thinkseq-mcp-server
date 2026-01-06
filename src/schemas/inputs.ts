@@ -25,12 +25,14 @@ export const ThinkSeqInputSchema = z.strictObject({
     .number()
     .int()
     .min(1)
+    .max(9007199254740991)
     .optional()
     .describe('Which thought number is being reconsidered'),
   branchFromThought: z
     .number()
     .int()
     .min(1)
+    .max(9007199254740991)
     .optional()
     .describe('Branching point thought number'),
   branchId: z.string().min(1).max(100).optional().describe('Branch identifier'),

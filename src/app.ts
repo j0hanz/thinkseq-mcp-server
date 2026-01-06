@@ -17,6 +17,7 @@ const SERVER_INSTRUCTIONS =
   'ThinkSeq is a tool for structured, sequential thinking with branching and revision support.';
 
 const DEFAULT_PACKAGE_READ_TIMEOUT_MS = 2000;
+const DEFAULT_SHUTDOWN_TIMEOUT_MS = 5000;
 
 interface Closeable extends Record<string, unknown> {
   close?: () => Promise<void> | void;
@@ -43,6 +44,7 @@ interface ShutdownDependencies {
   transport: Closeable;
   publishLifecycleEvent?: (event: LifecycleEvent) => void;
   now?: () => number;
+  shutdownTimeoutMs?: number;
 }
 
 export interface RunDependencies {
@@ -123,16 +125,28 @@ async function closeSafely(value: Closeable): Promise<void> {
   }
 }
 
+async function closeWithTimeout(
+  value: Closeable,
+  timeoutMs: number
+): Promise<void> {
+  const timeout = new Promise<void>((resolve) => {
+    setTimeout(resolve, timeoutMs);
+  });
+  await Promise.race([closeSafely(value), timeout]);
+}
+
 function installShutdownHandlers({
   processLike,
   server,
   transport,
   publishLifecycleEvent: publishLifecycle,
   now,
+  shutdownTimeoutMs,
 }: ShutdownDependencies): void {
   const proc = processLike ?? process;
   const emit = publishLifecycle ?? publishLifecycleEvent;
   const timestamp = now ?? Date.now;
+  const timeoutMs = shutdownTimeoutMs ?? DEFAULT_SHUTDOWN_TIMEOUT_MS;
   let shuttingDown = false;
 
   const shutdown = async (signal: string): Promise<void> => {
@@ -145,8 +159,8 @@ function installShutdownHandlers({
       signal,
     });
 
-    await closeSafely(server);
-    await closeSafely(transport);
+    await closeWithTimeout(server, timeoutMs);
+    await closeWithTimeout(transport, timeoutMs);
     proc.exit(0);
   };
 

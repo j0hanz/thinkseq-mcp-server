@@ -57,6 +57,7 @@ export class ThinkingEngine {
 
   processThought(input: ThoughtData): ProcessResult {
     this.#validateThoughtNumber(input);
+    this.#validateReferences(input);
     const totalThoughts = Math.max(input.totalThoughts, input.thoughtNumber);
     const stored: StoredThought = {
       ...input,
@@ -143,6 +144,31 @@ export class ThinkingEngine {
       expected: lastThought.thoughtNumber + 1,
       received: thoughtNumber,
     });
+  }
+
+  #validateReferences(input: ThoughtData): void {
+    const maxThoughtNumber = this.#thoughts.at(-1)?.thoughtNumber ?? 0;
+    this.#assertValidReference(
+      'revisesThought',
+      input.revisesThought,
+      maxThoughtNumber
+    );
+    this.#assertValidReference(
+      'branchFromThought',
+      input.branchFromThought,
+      maxThoughtNumber
+    );
+  }
+
+  #assertValidReference(
+    field: string,
+    value: number | undefined,
+    max: number
+  ): void {
+    if (value === undefined || value <= max) return;
+    throw new Error(
+      `${field} ${String(value)} references non-existent thought (max: ${String(max)})`
+    );
   }
 
   #pruneHistoryIfNeeded(): void {

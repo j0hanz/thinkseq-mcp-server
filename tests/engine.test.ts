@@ -57,6 +57,72 @@ void describe('ThinkingEngine.sequence', () => {
   });
 });
 
+void describe('ThinkingEngine.references.revisesThought', () => {
+  void it('should reject revisesThought referencing non-existent thought', () => {
+    const engine = new ThinkingEngine();
+    engine.processThought({
+      thought: 'First',
+      thoughtNumber: 1,
+      totalThoughts: 3,
+      nextThoughtNeeded: true,
+    });
+
+    assert.throws(() => {
+      engine.processThought({
+        thought: 'Invalid revision',
+        thoughtNumber: 2,
+        totalThoughts: 3,
+        nextThoughtNeeded: true,
+        isRevision: true,
+        revisesThought: 99,
+      });
+    }, /revisesThought 99 references non-existent thought/);
+  });
+
+  void it('should allow valid revisesThought reference', () => {
+    const engine = new ThinkingEngine();
+    engine.processThought({
+      thought: 'First',
+      thoughtNumber: 1,
+      totalThoughts: 3,
+      nextThoughtNeeded: true,
+    });
+
+    const result = engine.processThought({
+      thought: 'Valid revision of thought 1',
+      thoughtNumber: 2,
+      totalThoughts: 3,
+      nextThoughtNeeded: true,
+      isRevision: true,
+      revisesThought: 1,
+    });
+    assert.ok(result.ok);
+  });
+});
+
+void describe('ThinkingEngine.references.branchFromThought', () => {
+  void it('should reject branchFromThought referencing non-existent thought', () => {
+    const engine = new ThinkingEngine();
+    engine.processThought({
+      thought: 'First',
+      thoughtNumber: 1,
+      totalThoughts: 3,
+      nextThoughtNeeded: true,
+    });
+
+    assert.throws(() => {
+      engine.processThought({
+        thought: 'Invalid branch',
+        thoughtNumber: 2,
+        totalThoughts: 3,
+        nextThoughtNeeded: true,
+        branchFromThought: 50,
+        branchId: 'invalid-branch',
+      });
+    }, /branchFromThought 50 references non-existent thought/);
+  });
+});
+
 void describe('ThinkingEngine.sequence diagnostics', () => {
   void it('should emit diagnostics event on sequence gap', async (t) => {
     const { messages } = captureDiagnostics(t, 'thinkseq:engine');

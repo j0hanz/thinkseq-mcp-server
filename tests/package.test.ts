@@ -52,3 +52,27 @@ void describe('package.readSelfPackageJson', () => {
     assert.equal(pkg.version, undefined);
   });
 });
+
+void describe('package.readSelfPackageJson resilience', () => {
+  void it('returns empty info when readFile throws', async () => {
+    const deps: PackageJsonDependencies = {
+      cwd: () => '/tmp',
+      readFile: () => Promise.reject(new Error('ENOENT: file not found')),
+    };
+
+    const pkg = await readSelfPackageJson(undefined, deps);
+    assert.equal(pkg.name, undefined);
+    assert.equal(pkg.version, undefined);
+  });
+
+  void it('returns empty info for malformed JSON', async () => {
+    const deps: PackageJsonDependencies = {
+      cwd: () => '/tmp',
+      readFile: () => Promise.resolve('{ invalid json'),
+    };
+
+    const pkg = await readSelfPackageJson(undefined, deps);
+    assert.equal(pkg.name, undefined);
+    assert.equal(pkg.version, undefined);
+  });
+});

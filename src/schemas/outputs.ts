@@ -36,11 +36,13 @@ const ErrorSchema = z.strictObject({
   message: z.string(),
 });
 
-interface ThinkSeqOutputValue {
-  ok: boolean;
-  result?: z.infer<typeof ResultSchema> | undefined;
-  error?: z.infer<typeof ErrorSchema> | undefined;
-}
+const BaseOutputSchema = z.strictObject({
+  ok: z.boolean(),
+  result: ResultSchema.optional(),
+  error: ErrorSchema.optional(),
+});
+
+type ThinkSeqOutputValue = z.infer<typeof BaseOutputSchema>;
 
 function addSuccessIssues(
   value: ThinkSeqOutputValue,
@@ -82,16 +84,12 @@ function addFailureIssues(
   }
 }
 
-export const ThinkSeqOutputSchema = z
-  .strictObject({
-    ok: z.boolean(),
-    result: ResultSchema.optional(),
-    error: ErrorSchema.optional(),
-  })
-  .superRefine((value, ctx) => {
+export const ThinkSeqOutputSchema = BaseOutputSchema.superRefine(
+  (value, ctx) => {
     if (value.ok) {
       addSuccessIssues(value, ctx);
     } else {
       addFailureIssues(value, ctx);
     }
-  });
+  }
+);

@@ -42,10 +42,13 @@ function buildPackageInfo(parsed: Record<string, unknown>): PackageInfo {
 }
 
 function parsePackageJson(raw: string): PackageInfo {
-  const parsed: unknown = JSON.parse(raw);
-  if (!isRecord(parsed)) return {};
-
-  return buildPackageInfo(parsed);
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!isRecord(parsed)) return {};
+    return buildPackageInfo(parsed);
+  } catch {
+    return {};
+  }
 }
 
 function resolveReadFile(deps?: PackageJsonDependencies): ReadFile {
@@ -67,11 +70,15 @@ export async function readSelfPackageJson(
   signal?: AbortSignal,
   deps?: PackageJsonDependencies
 ): Promise<PackageInfo> {
-  const readFileImpl = resolveReadFile(deps);
-  const cwd = resolveCwd(deps);
-  const raw = await readFileImpl(
-    join(cwd(), 'package.json'),
-    buildReadOptions(signal)
-  );
-  return parsePackageJson(raw);
+  try {
+    const readFileImpl = resolveReadFile(deps);
+    const cwd = resolveCwd(deps);
+    const raw = await readFileImpl(
+      join(cwd(), 'package.json'),
+      buildReadOptions(signal)
+    );
+    return parsePackageJson(raw);
+  } catch {
+    return {};
+  }
 }
