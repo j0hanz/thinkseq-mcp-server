@@ -2,8 +2,8 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 export interface PackageInfo {
-  name?: string | undefined;
-  version?: string | undefined;
+  name?: string;
+  version?: string;
 }
 
 type ReadFile = (
@@ -23,14 +23,29 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
+function readStringProp(
+  record: Record<string, unknown>,
+  key: 'name' | 'version'
+): string | undefined {
+  const value = record[key];
+  return typeof value === 'string' ? value : undefined;
+}
+
+function buildPackageInfo(parsed: Record<string, unknown>): PackageInfo {
+  const name = readStringProp(parsed, 'name');
+  const version = readStringProp(parsed, 'version');
+
+  return {
+    ...(name !== undefined ? { name } : {}),
+    ...(version !== undefined ? { version } : {}),
+  };
+}
+
 function parsePackageJson(raw: string): PackageInfo {
   const parsed: unknown = JSON.parse(raw);
   if (!isRecord(parsed)) return {};
 
-  return {
-    name: typeof parsed.name === 'string' ? parsed.name : undefined,
-    version: typeof parsed.version === 'string' ? parsed.version : undefined,
-  };
+  return buildPackageInfo(parsed);
 }
 
 function resolveReadFile(deps?: PackageJsonDependencies): ReadFile {

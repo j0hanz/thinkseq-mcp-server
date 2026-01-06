@@ -46,7 +46,17 @@ void describe('tools.registerThinkSeq metadata', () => {
   void it('registers tool metadata and schemas', () => {
     const server = new FakeServer();
     const engine = {
-      processThought: () => ({ ok: true }),
+      processThought: () => ({
+        ok: true,
+        result: {
+          thoughtNumber: 1,
+          totalThoughts: 1,
+          nextThoughtNeeded: false,
+          thoughtHistoryLength: 1,
+          branches: [],
+          context: { recentThoughts: [], hasRevisions: false },
+        },
+      }),
     } satisfies Pick<ThinkingEngine, 'processThought'>;
 
     registerThinkSeq(server as unknown as McpServer, engine as ThinkingEngine);
@@ -91,7 +101,7 @@ void describe('tools.registerThinkSeq handler success', () => {
     const response = server.registered.handler(input);
     assert.deepEqual(response.structuredContent, expected);
     assert.equal(response.isError, undefined);
-    assert.equal(response.content[0]?.text, JSON.stringify(expected));
+    assert.equal(response.content[0].text, JSON.stringify(expected));
   });
 });
 
@@ -112,7 +122,7 @@ void describe('tools.registerThinkSeq handler error', () => {
     const response = server.registered.handler(input);
     assert.equal(response.isError, true);
     assert.deepEqual(response.structuredContent.ok, false);
-    assert.deepEqual(response.structuredContent.error?.code, 'E_THINK');
+    assert.deepEqual(response.structuredContent.error.code, 'E_THINK');
   });
 });
 

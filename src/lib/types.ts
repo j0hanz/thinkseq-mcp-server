@@ -10,11 +10,11 @@ export interface ThoughtData {
   thoughtNumber: number;
   totalThoughts: number;
   nextThoughtNeeded: boolean;
-  isRevision?: boolean | undefined;
-  revisesThought?: number | undefined;
-  branchFromThought?: number | undefined;
-  branchId?: string | undefined;
-  thoughtType?: ThoughtType | undefined;
+  isRevision?: boolean;
+  revisesThought?: number;
+  branchFromThought?: number;
+  branchId?: string;
+  thoughtType?: ThoughtType;
 }
 
 export interface StoredThought extends ThoughtData {
@@ -25,24 +25,30 @@ export interface ContextSummary {
   recentThoughts: {
     number: number;
     preview: string;
-    type?: ThoughtType | undefined;
+    type?: ThoughtType;
   }[];
-  currentBranch?: string | undefined;
+  currentBranch?: string;
   hasRevisions: boolean;
 }
 
-export interface ProcessResult extends Record<string, unknown> {
-  ok: boolean;
-  result?: {
-    thoughtNumber: number;
-    totalThoughts: number;
-    nextThoughtNeeded: boolean;
-    thoughtHistoryLength: number;
-    branches: string[];
-    context: ContextSummary;
-  };
-  error?: {
-    code: string;
-    message: string;
-  };
-}
+export type ProcessResult =
+  | {
+      ok: true;
+      result: {
+        thoughtNumber: number;
+        totalThoughts: number;
+        nextThoughtNeeded: boolean;
+        thoughtHistoryLength: number;
+        branches: string[];
+        context: ContextSummary;
+      };
+      error?: never;
+    }
+  | {
+      ok: false;
+      error: {
+        code: string;
+        message: string;
+      };
+      result?: never;
+    };

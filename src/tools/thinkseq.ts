@@ -1,5 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
+import type { z } from 'zod';
+
 import type { ThinkingEngine } from '../engine.js';
 import { publishToolEvent } from '../lib/diagnostics.js';
 import { createErrorResponse, getErrorMessage } from '../lib/errors.js';
@@ -31,44 +33,66 @@ Key parameters:
 
 type ToolRegistrar = Pick<McpServer, 'registerTool'>;
 type EngineLike = Pick<ThinkingEngine, 'processThought'>;
+type ThinkSeqInput = z.input<typeof ThinkSeqInputSchema>;
+
+function withOptional<K extends keyof ThoughtData>(
+  target: ThoughtData,
+  key: K,
+  value: ThoughtData[K] | undefined
+): void {
+  if (value === undefined) return;
+  target[key] = value;
+}
+
+function normalizeThoughtInput(input: ThinkSeqInput): ThoughtData {
+  const normalized: ThoughtData = {
+    thought: input.thought,
+    thoughtNumber: input.thoughtNumber,
+    totalThoughts: input.totalThoughts,
+    nextThoughtNeeded: input.nextThoughtNeeded,
+  };
+  withOptional(normalized, 'isRevision', input.isRevision);
+  withOptional(normalized, 'revisesThought', input.revisesThought);
+  withOptional(normalized, 'branchFromThought', input.branchFromThought);
+  withOptional(normalized, 'branchId', input.branchId);
+  withOptional(normalized, 'thoughtType', input.thoughtType);
+  return normalized;
+}
 
 export function registerThinkSeq(
   server: ToolRegistrar,
   engine: EngineLike
 ): void {
-  server.registerTool(
-    'thinkseq',
-    THINKSEQ_TOOL_DEFINITION,
-    (input: ThoughtData) => {
+  server.registerTool('thinkseq', THINKSEQ_TOOL_DEFINITION, (input) => {
+    const normalized = normalizeThoughtInput(input);
+    publishToolEvent({
+      type: 'tool.start',
+      tool: 'thinkseq',
+      ts: Date.now(),
+    });
+    try {
+      const result = engine.processThought(normalized);
       publishToolEvent({
-        type: 'tool.start',
+        type: 'tool.end',
         tool: 'thinkseq',
         ts: Date.now(),
+        ok: true,
       });
-      try {
-        const result = engine.processThought(input);
-        publishToolEvent({
-          type: 'tool.end',
-          tool: 'thinkseq',
-          ts: Date.now(),
-          ok: true,
-        });
-        return {
-          content: [{ type: 'text', text: JSON.stringify(result) }],
-          structuredContent: result,
-        };
-      } catch (err) {
-        const errorMessage = getErrorMessage(err);
-        publishToolEvent({
-          type: 'tool.end',
-          tool: 'thinkseq',
-          ts: Date.now(),
-          ok: false,
-          errorCode: 'E_THINK',
-          errorMessage,
-        });
-        return createErrorResponse('E_THINK', errorMessage);
-      }
+      return {
+        content: [{ type: 'text', text: JSON.stringify(result) }],
+        structuredContent: result,
+      };
+    } catch (err) {
+      const errorMessage = getErrorMessage(err);
+      publishToolEvent({
+        type: 'tool.end',
+        tool: 'thinkseq',
+        ts: Date.now(),
+        ok: false,
+        errorCode: 'E_THINK',
+        errorMessage,
+      });
+      return createErrorResponse('E_THINK', errorMessage);
     }
-  );
+  });
 }
