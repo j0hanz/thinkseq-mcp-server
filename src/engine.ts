@@ -11,6 +11,12 @@ const MAX_THOUGHTS_CAP = 10000;
 const MAX_MEMORY_BYTES = 100 * 1024 * 1024; // 100MB soft cap
 const ESTIMATED_THOUGHT_OVERHEAD_BYTES = 200;
 
+export interface ThinkingEngineOptions {
+  maxThoughts?: number;
+  maxMemoryBytes?: number;
+  estimatedThoughtOverheadBytes?: number;
+}
+
 function normalizeMaxThoughts(value?: number): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
     return DEFAULT_MAX_THOUGHTS;
@@ -19,13 +25,37 @@ function normalizeMaxThoughts(value?: number): number {
   return clamped;
 }
 
+function normalizePositiveInt(
+  value: number | undefined,
+  fallback: number
+): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return fallback;
+  }
+  return Math.max(1, Math.trunc(value));
+}
+
 export class ThinkingEngine {
   private thoughts: StoredThought[] = [];
   private branches = new Map<string, StoredThought[]>();
   private readonly maxThoughts: number;
+  private readonly maxMemoryBytes: number;
+  private readonly estimatedThoughtOverheadBytes: number;
 
-  constructor(maxThoughts?: number) {
-    this.maxThoughts = normalizeMaxThoughts(maxThoughts);
+  constructor(maxThoughtsOrOptions?: number | ThinkingEngineOptions) {
+    const options =
+      typeof maxThoughtsOrOptions === 'number'
+        ? { maxThoughts: maxThoughtsOrOptions }
+        : (maxThoughtsOrOptions ?? {});
+    this.maxThoughts = normalizeMaxThoughts(options.maxThoughts);
+    this.maxMemoryBytes = normalizePositiveInt(
+      options.maxMemoryBytes,
+      MAX_MEMORY_BYTES
+    );
+    this.estimatedThoughtOverheadBytes = normalizePositiveInt(
+      options.estimatedThoughtOverheadBytes,
+      ESTIMATED_THOUGHT_OVERHEAD_BYTES
+    );
   }
 
   processThought(input: ThoughtData): ProcessResult {
@@ -145,10 +175,10 @@ export class ThinkingEngine {
 
     // Memory-aware pruning: estimate current memory usage
     const estimatedBytes = this.thoughts.reduce((sum, t) => {
-      return sum + t.thought.length * 2 + ESTIMATED_THOUGHT_OVERHEAD_BYTES;
+      return sum + t.thought.length * 2 + this.estimatedThoughtOverheadBytes;
     }, 0);
 
-    if (estimatedBytes > MAX_MEMORY_BYTES && this.thoughts.length > 10) {
+    if (estimatedBytes > this.maxMemoryBytes && this.thoughts.length > 10) {
       // Prune oldest 20% when over memory threshold
       const toRemove = Math.ceil(this.thoughts.length * 0.2);
       this.thoughts.splice(0, toRemove);

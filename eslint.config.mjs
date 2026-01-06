@@ -1,5 +1,6 @@
 import eslint from '@eslint/js';
 import eslintConfigPrettier from 'eslint-config-prettier';
+import sonarjs from 'eslint-plugin-sonarjs';
 import unusedImports from 'eslint-plugin-unused-imports';
 import { defineConfig } from 'eslint/config';
 import tseslint from 'typescript-eslint';
@@ -21,7 +22,7 @@ export default defineConfig(
         tsconfigRootDir: import.meta.dirname,
       },
     },
-    plugins: { 'unused-imports': unusedImports },
+    plugins: { 'unused-imports': unusedImports, sonarjs },
     rules: {
       'unused-imports/no-unused-imports': 'error',
       '@typescript-eslint/consistent-type-imports': [
@@ -45,14 +46,16 @@ export default defineConfig(
       '@typescript-eslint/only-throw-error': 'error',
       complexity: ['error', { max: 5, variant: 'classic' }],
       'max-depth': ['error', 2],
+      'max-params': ['error', 3],
       'max-lines': [
         'error',
         { max: 300, skipBlankLines: true, skipComments: true },
       ],
       'max-lines-per-function': [
         'error',
-        { max: 40, skipBlankLines: true, skipComments: true },
+        { max: 45, skipBlankLines: true, skipComments: true },
       ],
+      'sonarjs/cognitive-complexity': ['error', 10],
       'prefer-const': 'error',
       'no-var': 'error',
     },

@@ -109,4 +109,35 @@ void describe('ThinkingEngine.pruning', () => {
     assert.ok(result.result);
     assert.ok(result.result.thoughtHistoryLength <= 5);
   });
+
+  void it('should prune when memory cap exceeded', () => {
+    const engine = new ThinkingEngine({
+      maxThoughts: 1000,
+      maxMemoryBytes: 50,
+      estimatedThoughtOverheadBytes: 1,
+    });
+
+    const result = processThoughts(engine, 12);
+
+    assert.ok(result?.result);
+    assert.ok(result.result.thoughtHistoryLength < 12);
+    assert.ok(result.result.branches.includes('branch-a'));
+  });
 });
+
+const processThoughts = (
+  engine: ThinkingEngine,
+  count: number
+): ReturnType<ThinkingEngine['processThought']> | undefined => {
+  let result: ReturnType<ThinkingEngine['processThought']> | undefined;
+  for (let i = 1; i <= count; i += 1) {
+    result = engine.processThought({
+      thought: 'x'.repeat(10),
+      thoughtNumber: i,
+      totalThoughts: count,
+      nextThoughtNeeded: i < count,
+      branchId: i === count ? 'branch-a' : undefined,
+    });
+  }
+  return result;
+};

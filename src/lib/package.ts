@@ -5,6 +5,13 @@ export interface PackageInfo {
   version?: string | undefined;
 }
 
+export interface PackageJsonDependencies {
+  readFile?: typeof readFile;
+  nodeModule?: NodeModuleFacade;
+  loadNodeModule?: () => Promise<NodeModuleFacade>;
+  disableCache?: boolean;
+}
+
 interface NodeModuleFacade {
   findPackageJSON?: (specifier: string, base?: string) => string | undefined;
   createRequire: (url: string) => (id: string) => unknown;
@@ -33,13 +40,14 @@ function getEffectiveSignal(signal?: AbortSignal): AbortSignal {
 
 async function readPackageJsonViaFind(
   nodeModule: NodeModuleFacade,
+  readFileImpl: typeof readFile,
   signal?: AbortSignal
 ): Promise<PackageInfo | undefined> {
   if (typeof nodeModule.findPackageJSON !== 'function') return undefined;
   const packageJsonPath = nodeModule.findPackageJSON('.', import.meta.url);
   if (!packageJsonPath) return undefined;
 
-  const raw = await readFile(packageJsonPath, {
+  const raw = await readFileImpl(packageJsonPath, {
     encoding: 'utf8',
     signal: getEffectiveSignal(signal),
   });
@@ -59,17 +67,14 @@ function readPackageJsonViaRequire(nodeModule: NodeModuleFacade): PackageInfo {
   };
 }
 
-async function loadPackageInfo(signal?: AbortSignal): Promise<PackageInfo> {
-  const nodeModule = (await import('node:module')) as NodeModuleFacade;
-  const viaFind = await readPackageJsonViaFind(nodeModule, signal);
-  if (viaFind !== undefined) return viaFind;
-  return readPackageJsonViaRequire(nodeModule);
-}
-
 export async function readSelfPackageJson(
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  deps?: PackageJsonDependencies
 ): Promise<PackageInfo> {
-  cached ??= loadPackageInfo(signal);
+  if (deps?.disableCache) {
+    return loadPackageInfoWithDeps(signal, deps);
+  }
+  cached ??= loadPackageInfoWithDeps(signal, deps);
   try {
     return await cached;
   } catch (err) {
@@ -77,4 +82,31 @@ export async function readSelfPackageJson(
     cached = undefined;
     throw err;
   }
+}
+
+export function resetPackageJsonCache(): void {
+  cached = undefined;
+}
+
+async function resolveNodeModule(
+  deps?: PackageJsonDependencies
+): Promise<NodeModuleFacade> {
+  if (deps?.nodeModule) return deps.nodeModule;
+  if (deps?.loadNodeModule) return deps.loadNodeModule();
+  return (await import('node:module')) as NodeModuleFacade;
+}
+
+async function loadPackageInfoWithDeps(
+  signal?: AbortSignal,
+  deps?: PackageJsonDependencies
+): Promise<PackageInfo> {
+  const nodeModule = await resolveNodeModule(deps);
+  const readFileImpl = deps?.readFile ?? readFile;
+  const viaFind = await readPackageJsonViaFind(
+    nodeModule,
+    readFileImpl,
+    signal
+  );
+  if (viaFind !== undefined) return viaFind;
+  return readPackageJsonViaRequire(nodeModule);
 }
