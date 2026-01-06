@@ -14,14 +14,18 @@ Each thought builds on previous ones. You can branch to explore alternatives or 
 
 const DEFAULT_PACKAGE_READ_TIMEOUT_MS = 2000;
 
-interface Closeable {
+type Closeable = Record<string, unknown> & {
   close?: () => Promise<void> | void;
-}
+};
 
 interface ProcessLike {
   on: (event: string, listener: (...args: unknown[]) => void) => void;
   exit: (code: number) => void;
 }
+
+type ServerLike = Pick<McpServer, 'connect' | 'registerTool'>;
+type TransportLike = Pick<StdioServerTransport, 'close'>;
+type EngineLike = Pick<ThinkingEngine, 'processThought'>;
 
 export interface ProcessErrorHandlerDeps {
   processLike?: ProcessLike;
@@ -42,26 +46,15 @@ export interface RunDependencies {
   packageReadTimeoutMs?: number;
   readPackageJson?: (signal?: AbortSignal) => Promise<PackageInfo>;
   publishLifecycleEvent?: (event: LifecycleEvent) => void;
-  createServer?: (name: string, version: string) => McpServer;
-  connectServer?: (server: McpServer) => Promise<StdioServerTransport>;
-  registerTool?: (server: McpServer, engine: ThinkingEngine) => void;
-  engineFactory?: () => ThinkingEngine;
+  createServer?: (name: string, version: string) => ServerLike;
+  connectServer?: (server: ServerLike) => Promise<TransportLike>;
+  registerTool?: (server: ServerLike, engine: EngineLike) => void;
+  engineFactory?: () => EngineLike;
   installShutdownHandlers?: (deps: ShutdownDependencies) => void;
   now?: () => number;
 }
 
-interface ResolvedRunDependencies {
-  processLike: ProcessLike;
-  packageReadTimeoutMs: number;
-  readPackageJson: (signal?: AbortSignal) => Promise<PackageInfo>;
-  publishLifecycleEvent: (event: LifecycleEvent) => void;
-  createServer: (name: string, version: string) => McpServer;
-  connectServer: (server: McpServer) => Promise<StdioServerTransport>;
-  registerTool: (server: McpServer, engine: ThinkingEngine) => void;
-  engineFactory: () => ThinkingEngine;
-  installShutdownHandlers: (deps: ShutdownDependencies) => void;
-  now: () => number;
-}
+type ResolvedRunDependencies = Required<RunDependencies>;
 
 function createProcessErrorHandler(
   label: 'unhandledRejection' | 'uncaughtException',
@@ -96,7 +89,7 @@ export function installProcessErrorHandlers(
   );
 }
 
-function createServer(name: string, version: string): McpServer {
+function createServer(name: string, version: string): ServerLike {
   return new McpServer(
     { name, version },
     {
@@ -106,7 +99,7 @@ function createServer(name: string, version: string): McpServer {
   );
 }
 
-async function connectServer(server: McpServer): Promise<StdioServerTransport> {
+async function connectServer(server: ServerLike): Promise<TransportLike> {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   return transport;
@@ -120,6 +113,25 @@ function normalizePackageInfo(pkg: PackageInfo): {
     name: pkg.name ?? 'thinkseq',
     version: pkg.version ?? '0.0.0',
   };
+}
+
+const DEFAULT_RUN_DEPENDENCIES: ResolvedRunDependencies = {
+  processLike: process,
+  packageReadTimeoutMs: DEFAULT_PACKAGE_READ_TIMEOUT_MS,
+  readPackageJson: readSelfPackageJson,
+  publishLifecycleEvent,
+  createServer,
+  connectServer,
+  registerTool: registerThinkSeq,
+  engineFactory: () => new ThinkingEngine(),
+  installShutdownHandlers,
+  now: Date.now,
+};
+
+function resolveRunDependencies(
+  deps: RunDependencies
+): ResolvedRunDependencies {
+  return { ...DEFAULT_RUN_DEPENDENCIES, ...deps };
 }
 
 async function closeSafely(value: Closeable): Promise<void> {
@@ -165,36 +177,6 @@ function installShutdownHandlers({
   proc.on('SIGINT', () => {
     void shutdown('SIGINT');
   });
-}
-
-function resolveRunDependencies(
-  deps: RunDependencies
-): ResolvedRunDependencies {
-  return {
-    processLike: withDefault(deps.processLike, process),
-    packageReadTimeoutMs: withDefault(
-      deps.packageReadTimeoutMs,
-      DEFAULT_PACKAGE_READ_TIMEOUT_MS
-    ),
-    readPackageJson: withDefault(deps.readPackageJson, readSelfPackageJson),
-    publishLifecycleEvent: withDefault(
-      deps.publishLifecycleEvent,
-      publishLifecycleEvent
-    ),
-    createServer: withDefault(deps.createServer, createServer),
-    connectServer: withDefault(deps.connectServer, connectServer),
-    registerTool: withDefault(deps.registerTool, registerThinkSeq),
-    engineFactory: withDefault(deps.engineFactory, () => new ThinkingEngine()),
-    installShutdownHandlers: withDefault(
-      deps.installShutdownHandlers,
-      installShutdownHandlers
-    ),
-    now: withDefault(deps.now, Date.now),
-  };
-}
-
-function withDefault<T>(value: T | undefined, fallback: T): T {
-  return value ?? fallback;
 }
 
 export async function run(deps: RunDependencies = {}): Promise<void> {

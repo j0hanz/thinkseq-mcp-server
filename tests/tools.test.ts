@@ -53,12 +53,8 @@ void describe('tools.registerThinkSeq metadata', () => {
 
     assert.ok(server.registered);
     assert.equal(server.registered.name, 'thinkseq');
-    const definition = server.registered.definition as {
-      title?: unknown;
-      inputSchema?: unknown;
-      outputSchema?: unknown;
-      annotations?: unknown;
-    };
+    const definition = server.registered.definition;
+    assert.ok(isRecord(definition));
     assert.equal(definition.title, 'Think Sequentially');
     assert.equal(definition.inputSchema, ThinkSeqInputSchema);
     assert.equal(definition.outputSchema, ThinkSeqOutputSchema);
@@ -119,3 +115,7 @@ void describe('tools.registerThinkSeq handler error', () => {
     assert.deepEqual(response.structuredContent.error?.code, 'E_THINK');
   });
 });
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}

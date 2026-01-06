@@ -29,9 +29,12 @@ Key parameters:
   },
 };
 
+type ToolRegistrar = Pick<McpServer, 'registerTool'>;
+type EngineLike = Pick<ThinkingEngine, 'processThought'>;
+
 export function registerThinkSeq(
-  server: McpServer,
-  engine: ThinkingEngine
+  server: ToolRegistrar,
+  engine: EngineLike
 ): void {
   server.registerTool(
     'thinkseq',

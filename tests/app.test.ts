@@ -1,12 +1,21 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-
 import type { RunDependencies } from '../src/app.js';
 import { installProcessErrorHandlers, run } from '../src/app.js';
 import type { LifecycleEvent } from '../src/lib/diagnostics.js';
+
+type ServerLike =
+  NonNullable<RunDependencies['createServer']> extends (
+    name: string,
+    version: string
+  ) => infer S
+    ? S
+    : never;
+
+type TransportLike = Awaited<
+  ReturnType<NonNullable<RunDependencies['connectServer']>>
+>;
 
 interface ProcessStub {
   on: (event: string, listener: (...args: unknown[]) => void) => void;
@@ -29,6 +38,19 @@ const createProcessStub = (): ProcessStub => {
     },
   };
 };
+
+const createServerStub = (): ServerLike => ({
+  registerTool: () => {
+    return {};
+  },
+  connect: () => Promise.resolve(),
+});
+
+const createTransportStub = (): TransportLike => ({
+  close: () => {
+    return undefined;
+  },
+});
 
 void describe('app.installProcessErrorHandlers', () => {
   void it('logs and exits on unhandledRejection', () => {
@@ -73,28 +95,34 @@ void describe('app.run', () => {
     await run(harness.deps);
 
     assert.ok(harness.getSignal());
-    assert.deepEqual(harness.events, [{ type: 'lifecycle.started', ts: 42 }]);
-    assert.deepEqual(harness.calls, [
-      'create:thinkseq:0.0.0',
-      'register:ok',
-      'connect:ok',
-      'shutdown:ok',
+    assert.deepEqual(harness.state.events, [
+      { type: 'lifecycle.started', ts: 42 },
     ]);
+    assert.deepEqual(harness.state.calls, [
+      'create:thinkseq:0.0.0',
+      'register',
+      'connect',
+      'shutdown',
+    ]);
+    assert.equal(harness.state.registeredServer, harness.state.server);
+    assert.equal(harness.state.connectedServer, harness.state.server);
+    assert.deepEqual(harness.state.shutdown, {
+      server: harness.state.server,
+      transport: harness.state.transport,
+    });
   });
 });
 
 const createRunHarness = (): {
   deps: RunDependencies;
-  events: LifecycleEvent[];
-  calls: string[];
+  state: RunState;
   getSignal: () => AbortSignal | undefined;
 } => {
   const state = createRunState();
   const deps = buildRunDependencies(state);
   return {
     deps,
-    events: state.events,
-    calls: state.calls,
+    state,
     getSignal: () => state.seenSignal,
   };
 };
@@ -104,8 +132,11 @@ interface RunState {
   events: LifecycleEvent[];
   calls: string[];
   seenSignal?: AbortSignal;
-  server: McpServer;
-  transport: StdioServerTransport;
+  server: ServerLike;
+  transport: TransportLike;
+  registeredServer?: ServerLike;
+  connectedServer?: ServerLike;
+  shutdown?: { server: unknown; transport: unknown };
 }
 
 const createRunState = (): RunState => {
@@ -114,8 +145,11 @@ const createRunState = (): RunState => {
     events: [],
     calls: [],
     seenSignal: undefined,
-    server: { id: 'server' } as unknown as McpServer,
-    transport: { id: 'transport' } as unknown as StdioServerTransport,
+    server: createServerStub(),
+    transport: createTransportStub(),
+    registeredServer: undefined,
+    connectedServer: undefined,
+    shutdown: undefined,
   };
 };
 
@@ -133,20 +167,19 @@ const buildRunDependencies = (state: RunState): RunDependencies => {
       state.calls.push(`create:${name}:${version}`);
       return state.server;
     },
-    connectServer: (value) => {
-      state.calls.push(value === state.server ? 'connect:ok' : 'connect:bad');
+    connectServer: (server) => {
+      state.calls.push('connect');
+      state.connectedServer = server;
       return Promise.resolve(state.transport);
     },
-    registerTool: (value, engine) => {
+    registerTool: (server, engine) => {
       void engine;
-      state.calls.push(value === state.server ? 'register:ok' : 'register:bad');
+      state.calls.push('register');
+      state.registeredServer = server;
     },
     installShutdownHandlers: ({ server, transport }) => {
-      state.calls.push(
-        server === state.server && transport === state.transport
-          ? 'shutdown:ok'
-          : 'shutdown:bad'
-      );
+      state.calls.push('shutdown');
+      state.shutdown = { server, transport };
     },
   };
 };

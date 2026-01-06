@@ -1,11 +1,10 @@
 import assert from 'node:assert/strict';
+import diagnostics_channel from 'node:diagnostics_channel';
 import { describe, it } from 'node:test';
+import type { TestContext } from 'node:test';
 
 import { ThinkingEngine } from '../src/engine.js';
-import {
-  assertSequenceGapMessage,
-  captureDiagnostics,
-} from './helpers/diagnostics.js';
+import type { ThoughtData } from '../src/lib/types.js';
 
 void describe('ThinkingEngine.basic', () => {
   void it('should process a simple thought', () => {
@@ -87,23 +86,7 @@ void describe('ThinkingEngine.sequence diagnostics', () => {
 void describe('ThinkingEngine.pruning', () => {
   void it('should prune old thoughts when count exceeds max', () => {
     const engine = new ThinkingEngine(5); // Small limit for testing
-
-    // Add 7 thoughts
-    for (let i = 1; i <= 7; i++) {
-      engine.processThought({
-        thought: `Thought ${String(i)}`,
-        thoughtNumber: i,
-        totalThoughts: 10,
-        nextThoughtNeeded: true,
-      });
-    }
-
-    const result = engine.processThought({
-      thought: 'Thought 8',
-      thoughtNumber: 8,
-      totalThoughts: 10,
-      nextThoughtNeeded: false,
-    });
+    const result = processInputs(engine, buildCountPruneInputs());
 
     // Should have pruned to 5 thoughts max
     assert.ok(result.result);
@@ -116,28 +99,122 @@ void describe('ThinkingEngine.pruning', () => {
       maxMemoryBytes: 50,
       estimatedThoughtOverheadBytes: 1,
     });
+    const result = processInputs(engine, buildMemoryPruneInputs());
 
-    const result = processThoughts(engine, 12);
-
-    assert.ok(result?.result);
+    assert.ok(result.result);
     assert.ok(result.result.thoughtHistoryLength < 12);
     assert.ok(result.result.branches.includes('branch-a'));
   });
 });
 
-const processThoughts = (
+interface DiagnosticsCapture {
+  messages: unknown[];
+}
+
+function captureDiagnostics(
+  t: TestContext,
+  channel: string
+): DiagnosticsCapture {
+  const messages: unknown[] = [];
+  const handler = (message: unknown): void => {
+    messages.push(message);
+  };
+
+  diagnostics_channel.subscribe(channel, handler);
+  t.after(() => diagnostics_channel.unsubscribe(channel, handler));
+
+  return { messages };
+}
+
+function assertSequenceGapMessage(
+  messages: unknown[],
+  expected: number,
+  received: number
+): void {
+  const msg = getSingleMessage(messages);
+  assert.equal(msg.type, 'engine.sequence_gap');
+  assert.equal(msg.expected, expected);
+  assert.equal(msg.received, received);
+}
+
+function getSingleMessage(messages: unknown[]): Record<string, unknown> {
+  assert.equal(messages.length, 1);
+  const msg = messages[0];
+  assert.ok(isRecord(msg));
+  return msg;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function buildNumberedThoughts(
+  count: number,
+  totalThoughts: number
+): {
+  thought: string;
+  thoughtNumber: number;
+  totalThoughts: number;
+  nextThoughtNeeded: boolean;
+}[] {
+  return Array.from({ length: count }, (_, index) => ({
+    thought: `Thought ${String(index + 1)}`,
+    thoughtNumber: index + 1,
+    totalThoughts,
+    nextThoughtNeeded: true,
+  }));
+}
+
+function buildRepeatedThoughts(
+  count: number,
+  options: { total: number; thought: string }
+): {
+  thought: string;
+  thoughtNumber: number;
+  totalThoughts: number;
+  nextThoughtNeeded: boolean;
+}[] {
+  return Array.from({ length: count }, (_, index) => ({
+    thought: options.thought,
+    thoughtNumber: index + 1,
+    totalThoughts: options.total,
+    nextThoughtNeeded: true,
+  }));
+}
+
+function buildCountPruneInputs(): ThoughtData[] {
+  const firstSeven = buildNumberedThoughts(7, 10);
+  const finalThought: ThoughtData = {
+    thought: 'Thought 8',
+    thoughtNumber: 8,
+    totalThoughts: 10,
+    nextThoughtNeeded: false,
+  };
+  return [...firstSeven, finalThought];
+}
+
+function buildMemoryPruneInputs(): ThoughtData[] {
+  const baseThoughts = buildRepeatedThoughts(11, {
+    total: 12,
+    thought: 'x'.repeat(10),
+  });
+  const lastThought: ThoughtData = {
+    thought: 'x'.repeat(10),
+    thoughtNumber: 12,
+    totalThoughts: 12,
+    nextThoughtNeeded: false,
+    branchId: 'branch-a',
+  };
+  return [...baseThoughts, lastThought];
+}
+
+function processInputs(
   engine: ThinkingEngine,
-  count: number
-): ReturnType<ThinkingEngine['processThought']> | undefined => {
-  let result: ReturnType<ThinkingEngine['processThought']> | undefined;
-  for (let i = 1; i <= count; i += 1) {
-    result = engine.processThought({
-      thought: 'x'.repeat(10),
-      thoughtNumber: i,
-      totalThoughts: count,
-      nextThoughtNeeded: i < count,
-      branchId: i === count ? 'branch-a' : undefined,
-    });
-  }
-  return result;
-};
+  inputs: ThoughtData[]
+): ReturnType<ThinkingEngine['processThought']> {
+  const [first, ...rest] = inputs;
+  return rest.reduce(
+    (_, input) => engine.processThought(input),
+    engine.processThought(first)
+  );
+}
