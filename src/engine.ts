@@ -181,19 +181,20 @@ export class ThinkingEngine {
     if (this.#headIndex === 0) return;
     const totalLength = this.#totalLength();
     if (totalLength === 0) {
-      this.#thoughts = [];
-      this.#headIndex = 0;
+      this.#resetThoughts();
       return;
     }
-    if (
-      !force &&
-      this.#headIndex < COMPACT_THRESHOLD &&
-      this.#headIndex < this.#thoughts.length * COMPACT_RATIO
-    ) {
-      return;
-    }
+    if (!this.#shouldCompact(force)) return;
     this.#thoughts = this.#thoughts.slice(this.#headIndex);
     this.#headIndex = 0;
+  }
+
+  #shouldCompact(force: boolean): boolean {
+    if (force) return true;
+    return !(
+      this.#headIndex < COMPACT_THRESHOLD &&
+      this.#headIndex < this.#thoughts.length * COMPACT_RATIO
+    );
   }
 
   #pruneHistoryIfNeeded(): void {
@@ -232,10 +233,14 @@ export class ThinkingEngine {
     this.#estimatedBytes -= removedBytes;
     this.#headIndex = end;
     if (this.#totalLength() === 0) {
-      this.#thoughts = [];
-      this.#headIndex = 0;
-    } else {
-      this.#compactIfNeeded(forceCompact);
+      this.#resetThoughts();
+      return;
     }
+    this.#compactIfNeeded(forceCompact);
+  }
+
+  #resetThoughts(): void {
+    this.#thoughts = [];
+    this.#headIndex = 0;
   }
 }

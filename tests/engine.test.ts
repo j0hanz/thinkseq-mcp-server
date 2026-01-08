@@ -57,6 +57,32 @@ void describe('ThinkingEngine.progress', () => {
   });
 });
 
+void describe('ThinkingEngine.characterization', () => {
+  void it('should preserve new thought output shape', () => {
+    const engine = new ThinkingEngine();
+
+    const result = engine.processThought({
+      thought: 'First',
+      totalThoughts: 2,
+    });
+
+    assert.ok(result.ok);
+    assert.deepStrictEqual(result.result, {
+      thoughtNumber: 1,
+      totalThoughts: 2,
+      progress: 0.5,
+      isComplete: false,
+      thoughtHistoryLength: 1,
+      hasRevisions: false,
+      activePathLength: 1,
+      revisableThoughts: [1],
+      context: {
+        recentThoughts: [{ number: 1, preview: 'First' }],
+      },
+    });
+  });
+});
+
 void describe('ThinkingEngine.isComplete', () => {
   void it('should return isComplete: false until target reached', () => {
     const engine = new ThinkingEngine();
