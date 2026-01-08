@@ -32,6 +32,7 @@ logs/
 !.github/workflows/
 .vscode/*
 !.vscode/extensions.json
+!.vscode/tasks.json
 .idea/
 *.swp
 *.swo
@@ -53,3 +54,5 @@ coverage/
 # Local reports
 .jscpd/
 reports/
+metrics/
+scripts/
