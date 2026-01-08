@@ -1,3 +1,5 @@
+import { performance } from 'node:perf_hooks';
+
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 import type { z } from 'zod';
@@ -72,13 +74,16 @@ export function registerThinkSeq(
       tool: 'thinkseq',
       ts: Date.now(),
     });
+    const start = performance.now();
     try {
       const result = engine.processThought(normalized);
+      const durationMs = Math.max(0, performance.now() - start);
       publishToolEvent({
         type: 'tool.end',
         tool: 'thinkseq',
         ts: Date.now(),
         ok: true,
+        durationMs,
       });
       return {
         content: [{ type: 'text', text: JSON.stringify(result) }],
@@ -86,6 +91,7 @@ export function registerThinkSeq(
       };
     } catch (err) {
       const errorMessage = getErrorMessage(err);
+      const durationMs = Math.max(0, performance.now() - start);
       publishToolEvent({
         type: 'tool.end',
         tool: 'thinkseq',
@@ -93,6 +99,7 @@ export function registerThinkSeq(
         ok: false,
         errorCode: 'E_THINK',
         errorMessage,
+        durationMs,
       });
       return createErrorResponse('E_THINK', errorMessage);
     }

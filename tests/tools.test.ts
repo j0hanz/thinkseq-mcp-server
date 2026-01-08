@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
+import diagnostics_channel from 'node:diagnostics_channel';
 import { describe, it } from 'node:test';
+import type { TestContext } from 'node:test';
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
@@ -94,12 +96,38 @@ void describe('tools.registerThinkSeq handler success', () => {
     assert.ok(server.registered);
 
     const input = createThoughtInput();
-
-    const expected = engine.processThought(input);
     const response = server.registered.handler(input);
-    assert.deepEqual(response.structuredContent, expected);
+
+    assert.deepEqual(response.structuredContent.ok, true);
     assert.equal(response.isError, undefined);
-    assert.equal(response.content[0].text, JSON.stringify(expected));
+    assert.equal(
+      response.content[0].text,
+      JSON.stringify(response.structuredContent)
+    );
+  });
+});
+
+void describe('tools.registerThinkSeq diagnostics durationMs (success)', () => {
+  void it('publishes durationMs on success', async (t) => {
+    const { messages } = captureDiagnostics(t, 'thinkseq:tool');
+
+    const handler = registerThinkSeqForTests(createOkEngine());
+    handler(createThoughtInput());
+    await Promise.resolve();
+
+    assertToolMessagesHaveDuration(messages, true);
+  });
+});
+
+void describe('tools.registerThinkSeq diagnostics durationMs (error)', () => {
+  void it('publishes durationMs on error', async (t) => {
+    const { messages } = captureDiagnostics(t, 'thinkseq:tool');
+
+    const handler = registerThinkSeqForTests(createThrowingEngine());
+    handler(createThoughtInput());
+    await Promise.resolve();
+
+    assertToolMessagesHaveDuration(messages, false);
   });
 });
 
@@ -126,4 +154,85 @@ void describe('tools.registerThinkSeq handler error', () => {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
+}
+
+interface DiagnosticsCapture {
+  messages: unknown[];
+}
+
+function captureDiagnostics(
+  t: TestContext,
+  channel: string
+): DiagnosticsCapture {
+  const messages: unknown[] = [];
+  const handler = (message: unknown): void => {
+    messages.push(message);
+  };
+
+  diagnostics_channel.subscribe(channel, handler);
+  t.after(() => diagnostics_channel.unsubscribe(channel, handler));
+
+  return { messages };
+}
+
+function getMessageRecord(message: unknown): Record<string, unknown> {
+  assert.ok(isRecord(message));
+  return message;
+}
+
+function createOkEngine(): Pick<ThinkingEngine, 'processThought'> {
+  return {
+    processThought: (): ProcessResult => ({
+      ok: true,
+      result: {
+        thoughtNumber: 1,
+        totalThoughts: 1,
+        progress: 1,
+        nextThoughtNeeded: false,
+        thoughtHistoryLength: 1,
+        branches: [],
+        context: { recentThoughts: [], hasRevisions: false },
+      },
+    }),
+  };
+}
+
+function createThrowingEngine(): Pick<ThinkingEngine, 'processThought'> {
+  return {
+    processThought: (): ProcessResult => {
+      throw new Error('boom');
+    },
+  };
+}
+
+function registerThinkSeqForTests(
+  engine: Pick<ThinkingEngine, 'processThought'>
+): RegisteredTool['handler'] {
+  const server = new FakeServer();
+  registerThinkSeq(server as unknown as McpServer, engine);
+  assert.ok(server.registered);
+  return server.registered.handler;
+}
+
+function assertToolMessagesHaveDuration(
+  messages: unknown[],
+  ok: boolean
+): void {
+  assert.equal(messages.length, 2);
+  const start = getMessageRecord(messages[0]);
+  const end = getMessageRecord(messages[1]);
+
+  assert.equal(start.type, 'tool.start');
+  assert.equal(end.type, 'tool.end');
+  assert.equal(end.ok, ok);
+
+  if (!ok) {
+    assert.equal(end.errorCode, 'E_THINK');
+    assert.ok(typeof end.errorMessage === 'string');
+    assert.ok(end.errorMessage.length > 0);
+  }
+
+  assert.ok(typeof end.durationMs === 'number');
+  assert.ok(Number.isFinite(end.durationMs));
+  assert.ok(end.durationMs >= 0);
 }
