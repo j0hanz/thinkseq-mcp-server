@@ -1,4 +1,4 @@
-import diagnostics_channel from 'node:diagnostics_channel';
+import diagnosticsChannel from 'node:diagnostics_channel';
 
 export type ToolEvent =
   | {
@@ -34,12 +34,12 @@ export interface EngineEvent {
   received: number;
 }
 
-const toolChannel = diagnostics_channel.channel('thinkseq:tool');
-const lifecycleChannel = diagnostics_channel.channel('thinkseq:lifecycle');
-const engineChannel = diagnostics_channel.channel('thinkseq:engine');
+const toolChannel = diagnosticsChannel.channel('thinkseq:tool');
+const lifecycleChannel = diagnosticsChannel.channel('thinkseq:lifecycle');
+const engineChannel = diagnosticsChannel.channel('thinkseq:engine');
 
 function safePublish(
-  channel: diagnostics_channel.Channel,
+  channel: diagnosticsChannel.Channel,
   message: unknown
 ): void {
   if (!channel.hasSubscribers) return;

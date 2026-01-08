@@ -1,5 +1,9 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import type {
+  JSONRPCMessage,
+  MessageExtraInfo,
+} from '@modelcontextprotocol/sdk/types.js';
 
 import { publishLifecycleEvent } from './lib/diagnostics.js';
 import type { LifecycleEvent } from './lib/diagnostics.js';
@@ -37,12 +41,16 @@ interface ProcessLike {
 }
 
 interface ServerLike {
-  connect: McpServer['connect'];
+  connect: (transport: TransportLike) => Promise<void> | void;
   registerTool: McpServer['registerTool'];
 }
 
 interface TransportLike {
-  close: StdioServerTransport['close'];
+  start: () => Promise<void>;
+  send: (message: JSONRPCMessage) => Promise<void>;
+  close: () => Promise<void>;
+  onmessage?: (message: JSONRPCMessage, extra?: MessageExtraInfo) => void;
+  onerror?: (error: Error) => void;
 }
 
 interface EngineLike {
@@ -74,7 +82,10 @@ export interface RunDependencies {
   readPackageJson?: (signal?: AbortSignal) => Promise<PackageInfo>;
   publishLifecycleEvent?: (event: LifecycleEvent) => void;
   createServer?: (name: string, version: string) => ServerLike;
-  connectServer?: (server: ServerLike) => Promise<TransportLike>;
+  connectServer?: (
+    server: ServerLike,
+    createTransport?: () => TransportLike
+  ) => Promise<TransportLike>;
   registerTool?: (server: ServerLike, engine: EngineLike) => void;
   engineFactory?: () => EngineLike;
   installShutdownHandlers?: (deps: ShutdownDependencies) => void;
@@ -105,7 +116,7 @@ export function installProcessErrorHandlers(
   proc.on('uncaughtException', handlerFor('uncaughtException'));
 }
 
-function createServer(name: string, version: string): ServerLike {
+export function createServer(name: string, version: string): ServerLike {
   return new McpServer(
     { name, version },
     {
@@ -115,8 +126,11 @@ function createServer(name: string, version: string): ServerLike {
   );
 }
 
-async function connectServer(server: ServerLike): Promise<TransportLike> {
-  const transport = new StdioServerTransport();
+export async function connectServer(
+  server: ServerLike,
+  createTransport: () => TransportLike = () => new StdioServerTransport()
+): Promise<TransportLike> {
+  const transport = createTransport();
   await server.connect(transport);
   installStdioInvalidMessageGuards(transport);
   installStdioParseErrorResponder(transport);
@@ -156,36 +170,44 @@ async function closeWithTimeout(
   await Promise.race([closeSafely(value), timeout]);
 }
 
-function installShutdownHandlers({
-  processLike,
-  server,
-  engine,
-  transport,
-  publishLifecycleEvent: publishLifecycle,
-  now,
-  shutdownTimeoutMs,
-}: ShutdownDependencies): void {
-  const proc = processLike ?? process;
-  const emit = publishLifecycle ?? publishLifecycleEvent;
-  const timestamp = now ?? Date.now;
-  const timeoutMs = shutdownTimeoutMs ?? DEFAULT_SHUTDOWN_TIMEOUT_MS;
-  let shuttingDown = false;
+function emitShutdown(
+  emit: (event: LifecycleEvent) => void,
+  timestamp: () => number,
+  signal: string
+): void {
+  emit({
+    type: 'lifecycle.shutdown',
+    ts: timestamp(),
+    signal,
+  });
+}
 
-  const shutdown = async (signal: string): Promise<void> => {
+function resolveProcess(processLike?: ProcessLike): ProcessLike {
+  return processLike ?? process;
+}
+
+function buildShutdownRunner(
+  deps: ShutdownDependencies,
+  proc: ProcessLike
+): (signal: string) => Promise<void> {
+  const emit = deps.publishLifecycleEvent ?? publishLifecycleEvent;
+  const timestamp = deps.now ?? Date.now;
+  const timeoutMs = deps.shutdownTimeoutMs ?? DEFAULT_SHUTDOWN_TIMEOUT_MS;
+  let shuttingDown = false;
+  return async (signal: string): Promise<void> => {
     if (shuttingDown) return;
     shuttingDown = true;
-
-    emit({
-      type: 'lifecycle.shutdown',
-      ts: timestamp(),
-      signal,
-    });
-
-    await closeWithTimeout(server, timeoutMs);
-    await closeWithTimeout(engine, timeoutMs);
-    await closeWithTimeout(transport, timeoutMs);
+    emitShutdown(emit, timestamp, signal);
+    await closeWithTimeout(deps.server, timeoutMs);
+    await closeWithTimeout(deps.engine, timeoutMs);
+    await closeWithTimeout(deps.transport, timeoutMs);
     proc.exit(0);
   };
+}
+
+export function installShutdownHandlers(deps: ShutdownDependencies): void {
+  const proc = resolveProcess(deps.processLike);
+  const shutdown = buildShutdownRunner(deps, proc);
 
   proc.on('SIGTERM', () => {
     void shutdown('SIGTERM');

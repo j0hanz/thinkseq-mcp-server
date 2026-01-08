@@ -4,7 +4,11 @@ import { describe, it } from 'node:test';
 import type { TestContext } from 'node:test';
 
 import { ThinkingEngine } from '../src/engine.js';
-import type { ThoughtData } from '../src/lib/types.js';
+import {
+  buildCountPruneInputs,
+  buildMemoryPruneInputs,
+  processInputs,
+} from './helpers/engine.js';
 
 void describe('ThinkingEngine.basic', () => {
   void it('should process a simple thought', () => {
@@ -191,6 +195,39 @@ void describe('ThinkingEngine.sequence diagnostics', () => {
   });
 });
 
+void describe('ThinkingEngine.context', () => {
+  void it('should track branches and revisions in context', () => {
+    const engine = new ThinkingEngine();
+
+    engine.processThought({
+      thought: 'First',
+      thoughtNumber: 1,
+      totalThoughts: 2,
+      nextThoughtNeeded: true,
+      branchId: 'branch-a',
+      thoughtType: 'analysis',
+    });
+
+    const result = engine.processThought({
+      thought: 'Revision',
+      thoughtNumber: 2,
+      totalThoughts: 2,
+      nextThoughtNeeded: false,
+      isRevision: true,
+      revisesThought: 1,
+      branchFromThought: 1,
+      branchId: 'branch-a',
+      thoughtType: 'revision',
+    });
+
+    assert.ok(result.ok);
+    assert.ok(result.result.branches.includes('branch-a'));
+    assert.equal(result.result.context.currentBranch, 'branch-a');
+    assert.equal(result.result.context.hasRevisions, true);
+    assert.equal(result.result.context.recentThoughts[0].type, 'analysis');
+  });
+});
+
 void describe('ThinkingEngine.pruning', () => {
   void it('should prune old thoughts when count exceeds max', () => {
     const engine = new ThinkingEngine({ maxThoughts: 5 }); // Small limit for testing
@@ -254,75 +291,4 @@ function getSingleMessage(messages: unknown[]): Record<string, unknown> {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
-}
-
-function buildNumberedThoughts(
-  count: number,
-  totalThoughts: number
-): {
-  thought: string;
-  thoughtNumber: number;
-  totalThoughts: number;
-  nextThoughtNeeded: boolean;
-}[] {
-  return Array.from({ length: count }, (_, index) => ({
-    thought: `Thought ${String(index + 1)}`,
-    thoughtNumber: index + 1,
-    totalThoughts,
-    nextThoughtNeeded: true,
-  }));
-}
-
-function buildRepeatedThoughts(
-  count: number,
-  options: { total: number; thought: string }
-): {
-  thought: string;
-  thoughtNumber: number;
-  totalThoughts: number;
-  nextThoughtNeeded: boolean;
-}[] {
-  return Array.from({ length: count }, (_, index) => ({
-    thought: options.thought,
-    thoughtNumber: index + 1,
-    totalThoughts: options.total,
-    nextThoughtNeeded: true,
-  }));
-}
-
-function buildCountPruneInputs(): ThoughtData[] {
-  const firstSeven = buildNumberedThoughts(7, 10);
-  const finalThought: ThoughtData = {
-    thought: 'Thought 8',
-    thoughtNumber: 8,
-    totalThoughts: 10,
-    nextThoughtNeeded: false,
-  };
-  return [...firstSeven, finalThought];
-}
-
-function buildMemoryPruneInputs(): ThoughtData[] {
-  const baseThoughts = buildRepeatedThoughts(11, {
-    total: 12,
-    thought: 'x'.repeat(10),
-  });
-  const lastThought: ThoughtData = {
-    thought: 'x'.repeat(10),
-    thoughtNumber: 12,
-    totalThoughts: 12,
-    nextThoughtNeeded: false,
-    branchId: 'branch-a',
-  };
-  return [...baseThoughts, lastThought];
-}
-
-function processInputs(
-  engine: ThinkingEngine,
-  inputs: ThoughtData[]
-): ReturnType<ThinkingEngine['processThought']> {
-  const [first, ...rest] = inputs;
-  return rest.reduce(
-    (_, input) => engine.processThought(input),
-    engine.processThought(first)
-  );
 }

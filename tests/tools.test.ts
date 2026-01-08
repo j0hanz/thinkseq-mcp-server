@@ -113,6 +113,50 @@ void describe('tools.registerThinkSeq handler success', () => {
   });
 });
 
+void describe('tools.registerThinkSeq optional fields', () => {
+  void it('passes context and branch fields through', async () => {
+    const server = new FakeServer();
+    let seen: ThoughtData | undefined;
+    const engine = {
+      processThought: (input: ThoughtData): ProcessResult => {
+        seen = input;
+        return {
+          ok: true,
+          result: {
+            thoughtNumber: input.thoughtNumber,
+            totalThoughts: input.totalThoughts,
+            progress: input.thoughtNumber / input.totalThoughts,
+            nextThoughtNeeded: input.nextThoughtNeeded,
+            thoughtHistoryLength: 1,
+            branches: [],
+            context: { recentThoughts: [], hasRevisions: false },
+          },
+        };
+      },
+    };
+
+    registerThinkSeq(server as unknown as McpServer, engine);
+    assert.ok(server.registered);
+
+    const response = await server.registered.handler({
+      ...createThoughtInput(),
+      isRevision: true,
+      revisesThought: 1,
+      branchFromThought: 1,
+      branchId: 'branch-a',
+      thoughtType: 'analysis',
+    });
+
+    assert.ok(seen);
+    assert.equal(seen.isRevision, true);
+    assert.equal(seen.revisesThought, 1);
+    assert.equal(seen.branchFromThought, 1);
+    assert.equal(seen.branchId, 'branch-a');
+    assert.equal(seen.thoughtType, 'analysis');
+    assert.equal(response.structuredContent.ok, true);
+  });
+});
+
 void describe('tools.registerThinkSeq diagnostics durationMs (success)', () => {
   void it('publishes durationMs on success', async (t) => {
     const { messages } = captureDiagnostics(t, 'thinkseq:tool');

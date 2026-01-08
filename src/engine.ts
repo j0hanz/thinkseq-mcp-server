@@ -58,24 +58,40 @@ export class ThinkingEngine {
   processThought(input: ThoughtData): ProcessResult {
     this.#validateThoughtNumber(input);
     this.#validateReferences(input);
+    const stored = this.#createStoredThought(input);
+    this.#storeThought(stored);
+    this.#pruneHistoryIfNeeded();
+    return this.#buildProcessResult(stored);
+  }
+
+  #createStoredThought(input: ThoughtData): StoredThought {
     const totalThoughts = Math.max(input.totalThoughts, input.thoughtNumber);
-    const stored: StoredThought = {
+    return {
       ...input,
       totalThoughts,
       timestamp: Date.now(),
     };
+  }
+
+  #storeThought(stored: StoredThought): void {
     this.#thoughts.push(stored);
     this.#estimatedBytes += this.#estimateThoughtBytes(stored);
     if (stored.isRevision) this.#revisionCount += 1;
-    if (stored.branchId) {
-      const branch = this.#branches.get(stored.branchId);
-      if (branch) branch.push(stored);
-      else {
-        this.#branches.set(stored.branchId, [stored]);
-        this.#branchIdsDirty = true;
-      }
+    this.#storeBranchThought(stored);
+  }
+
+  #storeBranchThought(stored: StoredThought): void {
+    if (!stored.branchId) return;
+    const branch = this.#branches.get(stored.branchId);
+    if (branch) {
+      branch.push(stored);
+      return;
     }
-    this.#pruneHistoryIfNeeded();
+    this.#branches.set(stored.branchId, [stored]);
+    this.#branchIdsDirty = true;
+  }
+
+  #buildProcessResult(stored: StoredThought): ProcessResult {
     const context = this.#buildContextSummary();
     return {
       ok: true,
@@ -83,7 +99,7 @@ export class ThinkingEngine {
         thoughtNumber: stored.thoughtNumber,
         totalThoughts: stored.totalThoughts,
         progress: Math.min(1, stored.thoughtNumber / stored.totalThoughts),
-        nextThoughtNeeded: input.nextThoughtNeeded,
+        nextThoughtNeeded: stored.nextThoughtNeeded,
         thoughtHistoryLength: this.#thoughts.length,
         branches: this.#getBranchIds(),
         context,

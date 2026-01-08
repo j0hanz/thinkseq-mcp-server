@@ -18,18 +18,17 @@ function isStdioMessageTransport(
 }
 
 function sendInvalidRequest(transport: StdioMessageTransportLike): void {
-  void transport
-    .send?.({
-      jsonrpc: '2.0',
-      id: null,
-      error: {
-        code: ErrorCode.InvalidRequest,
-        message: 'Invalid Request',
-      },
-    })
-    .catch(() => {
-      return;
-    });
+  const sendPromise = transport.send?.({
+    jsonrpc: '2.0',
+    id: null,
+    error: {
+      code: ErrorCode.InvalidRequest,
+      message: 'Invalid Request',
+    },
+  });
+  sendPromise?.catch(() => {
+    return;
+  });
 }
 
 function isInvalidJsonRpcMessageShape(message: unknown): boolean {

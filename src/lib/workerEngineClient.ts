@@ -10,9 +10,23 @@ import type {
 } from './workerProtocol.js';
 import { isEngineWorkerResponse } from './workerProtocol.js';
 
+interface WorkerLike {
+  on: (
+    event: 'message' | 'messageerror' | 'error' | 'exit',
+    listener: (...args: unknown[]) => void
+  ) => void;
+  postMessage: (message: EngineWorkerRequest) => void;
+  terminate: () => Promise<unknown>;
+}
+
+type WorkerFactory = (entry: URL) => WorkerLike;
+
 export interface WorkerEngineClientOptions {
   timeoutMs?: number;
   maxInflight?: number;
+  workerFactory?: WorkerFactory;
+  entryExists?: (entry: URL) => boolean;
+  entryBaseUrl?: string;
 }
 
 interface Inflight {
@@ -21,23 +35,23 @@ interface Inflight {
   timeout: NodeJS.Timeout;
 }
 
-function getDistWorkerEntryUrl(): URL {
-  if (import.meta.url.includes('/dist/')) {
-    return new URL('../workers/engineWorker.js', import.meta.url);
+function getDistWorkerEntryUrl(baseUrl: string = import.meta.url): URL {
+  if (baseUrl.includes('/dist/')) {
+    return new URL('../workers/engineWorker.js', baseUrl);
   }
-  return new URL('../../dist/workers/engineWorker.js', import.meta.url);
+  return new URL('../../dist/workers/engineWorker.js', baseUrl);
 }
 
-function hasDistWorkerEntry(): boolean {
+function hasDistWorkerEntry(entry: URL): boolean {
   try {
-    return existsSync(fileURLToPath(getDistWorkerEntryUrl()));
+    return existsSync(fileURLToPath(entry));
   } catch {
     return false;
   }
 }
 
 export class WorkerEngineClient {
-  readonly #worker: Worker;
+  readonly #worker: WorkerLike;
   readonly #timeoutMs: number;
   readonly #maxInflight: number;
   #closed = false;
@@ -48,17 +62,37 @@ export class WorkerEngineClient {
     this.#timeoutMs = options.timeoutMs ?? 5000;
     this.#maxInflight = options.maxInflight ?? 100;
 
-    const entry = getDistWorkerEntryUrl();
-    if (!hasDistWorkerEntry()) {
+    const entry = getDistWorkerEntryUrl(options.entryBaseUrl);
+    this.#worker = this.#createWorker(
+      entry,
+      options.workerFactory,
+      options.entryExists
+    );
+    this.#attachWorkerHandlers();
+  }
+
+  #createWorker(
+    entry: URL,
+    workerFactory?: WorkerFactory,
+    entryExists?: (entry: URL) => boolean
+  ): WorkerLike {
+    if (workerFactory) {
+      return workerFactory(entry);
+    }
+
+    const exists = entryExists ?? hasDistWorkerEntry;
+    if (!exists(entry)) {
       throw new Error(
         `Worker engine entry not found at ${fileURLToPath(entry)}. Run "npm run build".`
       );
     }
 
-    this.#worker = new Worker(entry, {
+    return new Worker(entry, {
       argv: [],
     });
+  }
 
+  #attachWorkerHandlers(): void {
     this.#worker.on('message', (value: unknown) => {
       this.#onMessage(value);
     });
@@ -77,9 +111,9 @@ export class WorkerEngineClient {
           'E_WORKER_EXIT',
           `Worker exited with code ${String(code)}`
         );
-      } else {
-        this.#failAll('E_WORKER_EXIT', 'Worker exited');
+        return;
       }
+      this.#failAll('E_WORKER_EXIT', 'Worker exited');
     });
   }
 
@@ -96,24 +130,45 @@ export class WorkerEngineClient {
   }
 
   processThought(input: ThoughtData): Promise<ProcessResult> {
+    const failure = this.#getProcessFailure();
+    if (failure) return Promise.reject(failure);
+
+    const id = this.#nextId();
+    const request = this.#buildRequest(id, input);
+    return this.#dispatchRequest(id, request);
+  }
+
+  #getProcessFailure(): Error | null {
     if (this.#closed) {
-      return Promise.reject(new Error('Worker engine client is closed'));
+      return new Error('Worker engine client is closed');
     }
 
     if (this.#inflight.size >= this.#maxInflight) {
-      return Promise.reject(
-        new Error('Worker engine backpressure: too many inflight requests')
+      return new Error(
+        'Worker engine backpressure: too many inflight requests'
       );
     }
 
-    const id = String((this.#counter += 1));
+    return null;
+  }
 
-    const request: EngineWorkerRequest = {
+  #nextId(): string {
+    this.#counter += 1;
+    return String(this.#counter);
+  }
+
+  #buildRequest(id: string, input: ThoughtData): EngineWorkerRequest {
+    return {
       id,
       method: 'processThought',
       input,
     };
+  }
 
+  #dispatchRequest(
+    id: string,
+    request: EngineWorkerRequest
+  ): Promise<ProcessResult> {
     return new Promise<ProcessResult>((resolve, reject) => {
       const timeout = setTimeout(() => {
         this.#inflight.delete(id);

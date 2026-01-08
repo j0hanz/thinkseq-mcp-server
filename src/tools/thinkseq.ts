@@ -6,8 +6,9 @@ import type { z } from 'zod';
 
 import type { ThinkingEngine } from '../engine.js';
 import { publishToolEvent } from '../lib/diagnostics.js';
+import type { ErrorResponse } from '../lib/errors.js';
 import { createErrorResponse, getErrorMessage } from '../lib/errors.js';
-import type { ThoughtData } from '../lib/types.js';
+import type { ProcessResult, ThoughtData } from '../lib/types.js';
 import { ThinkSeqInputSchema } from '../schemas/inputs.js';
 import { ThinkSeqOutputSchema } from '../schemas/outputs.js';
 
@@ -41,6 +42,12 @@ interface EngineLike {
     | Promise<ReturnType<ThinkingEngine['processThought']>>;
 }
 type ThinkSeqInput = z.input<typeof ThinkSeqInputSchema>;
+type ToolResponse =
+  | ErrorResponse
+  | {
+      content: { type: 'text'; text: string }[];
+      structuredContent: ProcessResult;
+    };
 
 function getContextFields(input: ThinkSeqInput): Partial<ThoughtData> {
   return {
@@ -72,45 +79,72 @@ function normalizeThoughtInput(input: ThinkSeqInput): ThoughtData {
   };
 }
 
+function publishToolStart(): void {
+  publishToolEvent({
+    type: 'tool.start',
+    tool: 'thinkseq',
+    ts: Date.now(),
+  });
+}
+
+function publishToolSuccess(durationMs: number): void {
+  publishToolEvent({
+    type: 'tool.end',
+    tool: 'thinkseq',
+    ts: Date.now(),
+    ok: true,
+    durationMs,
+  });
+}
+
+function publishToolFailure(errorMessage: string, durationMs: number): void {
+  publishToolEvent({
+    type: 'tool.end',
+    tool: 'thinkseq',
+    ts: Date.now(),
+    ok: false,
+    errorCode: 'E_THINK',
+    errorMessage,
+    durationMs,
+  });
+}
+
+function buildSuccessResponse(result: ProcessResult): ToolResponse {
+  return {
+    content: [{ type: 'text', text: JSON.stringify(result) }],
+    structuredContent: result,
+  };
+}
+
+function getDurationMs(start: number): number {
+  return Math.max(0, performance.now() - start);
+}
+
+async function handleThinkSeq(
+  engine: EngineLike,
+  input: ThinkSeqInput
+): Promise<ToolResponse> {
+  const normalized = normalizeThoughtInput(input);
+  publishToolStart();
+  const start = performance.now();
+  try {
+    const result = await engine.processThought(normalized);
+    const durationMs = getDurationMs(start);
+    publishToolSuccess(durationMs);
+    return buildSuccessResponse(result);
+  } catch (err) {
+    const errorMessage = getErrorMessage(err);
+    const durationMs = getDurationMs(start);
+    publishToolFailure(errorMessage, durationMs);
+    return createErrorResponse('E_THINK', errorMessage);
+  }
+}
+
 export function registerThinkSeq(
   server: ToolRegistrar,
   engine: EngineLike
 ): void {
-  server.registerTool('thinkseq', THINKSEQ_TOOL_DEFINITION, async (input) => {
-    const normalized = normalizeThoughtInput(input);
-    publishToolEvent({
-      type: 'tool.start',
-      tool: 'thinkseq',
-      ts: Date.now(),
-    });
-    const start = performance.now();
-    try {
-      const result = await engine.processThought(normalized);
-      const durationMs = Math.max(0, performance.now() - start);
-      publishToolEvent({
-        type: 'tool.end',
-        tool: 'thinkseq',
-        ts: Date.now(),
-        ok: true,
-        durationMs,
-      });
-      return {
-        content: [{ type: 'text', text: JSON.stringify(result) }],
-        structuredContent: result,
-      };
-    } catch (err) {
-      const errorMessage = getErrorMessage(err);
-      const durationMs = Math.max(0, performance.now() - start);
-      publishToolEvent({
-        type: 'tool.end',
-        tool: 'thinkseq',
-        ts: Date.now(),
-        ok: false,
-        errorCode: 'E_THINK',
-        errorMessage,
-        durationMs,
-      });
-      return createErrorResponse('E_THINK', errorMessage);
-    }
-  });
+  server.registerTool('thinkseq', THINKSEQ_TOOL_DEFINITION, (input) =>
+    handleThinkSeq(engine, input)
+  );
 }
