@@ -17,18 +17,30 @@ function isStdioMessageTransport(
   );
 }
 
-function sendInvalidRequest(transport: StdioMessageTransportLike): void {
+function sendError(
+  transport: StdioMessageTransportLike,
+  code: number,
+  message: string
+): void {
   const sendPromise = transport.send?.({
     jsonrpc: '2.0',
     id: null,
     error: {
-      code: ErrorCode.InvalidRequest,
-      message: 'Invalid Request',
+      code,
+      message,
     },
   });
   sendPromise?.catch(() => {
     return;
   });
+}
+
+function sendInvalidRequest(transport: StdioMessageTransportLike): void {
+  sendError(transport, ErrorCode.InvalidRequest, 'Invalid Request');
+}
+
+function sendParseError(transport: StdioMessageTransportLike): void {
+  sendError(transport, ErrorCode.ParseError, 'Parse error');
 }
 
 function isInvalidJsonRpcMessageShape(message: unknown): boolean {
@@ -37,11 +49,12 @@ function isInvalidJsonRpcMessageShape(message: unknown): boolean {
   );
 }
 
-function isParseOrSchemaError(error: unknown): boolean {
-  return (
-    error instanceof SyntaxError ||
-    (error instanceof Error && error.name === 'ZodError')
-  );
+function isParseError(error: unknown): boolean {
+  return error instanceof SyntaxError;
+}
+
+function isSchemaError(error: unknown): boolean {
+  return error instanceof Error && error.name === 'ZodError';
 }
 
 export function installStdioInvalidMessageGuards(transport: unknown): void {
@@ -69,8 +82,13 @@ export function installStdioParseErrorResponder(transport: unknown): void {
   transport.onerror = (error: unknown) => {
     originalOnError?.(error);
 
-    if (!isParseOrSchemaError(error)) return;
+    if (isParseError(error)) {
+      sendParseError(transport);
+      return;
+    }
 
-    sendInvalidRequest(transport);
+    if (isSchemaError(error)) {
+      sendInvalidRequest(transport);
+    }
   };
 }

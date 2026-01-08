@@ -37,60 +37,17 @@ const ErrorSchema = z.strictObject({
   message: z.string(),
 });
 
-const BaseOutputSchema = z.strictObject({
-  ok: z.boolean(),
-  result: ResultSchema.optional(),
-  error: ErrorSchema.optional(),
+const SuccessSchema = z.strictObject({
+  ok: z.literal(true),
+  result: ResultSchema,
 });
 
-type ThinkSeqOutputValue = z.infer<typeof BaseOutputSchema>;
+const FailureSchema = z.strictObject({
+  ok: z.literal(false),
+  error: ErrorSchema,
+});
 
-function addSuccessIssues(
-  value: ThinkSeqOutputValue,
-  ctx: z.RefinementCtx
-): void {
-  if (value.result === undefined) {
-    ctx.addIssue({
-      code: 'custom',
-      message: 'result is required when ok is true',
-      path: ['result'],
-    });
-  }
-  if (value.error !== undefined) {
-    ctx.addIssue({
-      code: 'custom',
-      message: 'error must be omitted when ok is true',
-      path: ['error'],
-    });
-  }
-}
-
-function addFailureIssues(
-  value: ThinkSeqOutputValue,
-  ctx: z.RefinementCtx
-): void {
-  if (value.error === undefined) {
-    ctx.addIssue({
-      code: 'custom',
-      message: 'error is required when ok is false',
-      path: ['error'],
-    });
-  }
-  if (value.result !== undefined) {
-    ctx.addIssue({
-      code: 'custom',
-      message: 'result must be omitted when ok is false',
-      path: ['result'],
-    });
-  }
-}
-
-export const ThinkSeqOutputSchema = BaseOutputSchema.superRefine(
-  (value, ctx) => {
-    if (value.ok) {
-      addSuccessIssues(value, ctx);
-    } else {
-      addFailureIssues(value, ctx);
-    }
-  }
-);
+export const ThinkSeqOutputSchema = z.discriminatedUnion('ok', [
+  SuccessSchema,
+  FailureSchema,
+]);

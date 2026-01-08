@@ -10,11 +10,18 @@ const DEFAULT_MAX_THOUGHTS = 500;
 const MAX_THOUGHTS_CAP = 10000;
 const MAX_MEMORY_BYTES = 100 * 1024 * 1024;
 const ESTIMATED_THOUGHT_OVERHEAD_BYTES = 200;
+const COMPACT_THRESHOLD = 1024;
+const COMPACT_RATIO = 0.5;
 
 export interface ThinkingEngineOptions {
   maxThoughts?: number;
   maxMemoryBytes?: number;
   estimatedThoughtOverheadBytes?: number;
+}
+
+interface BranchState {
+  thoughts: StoredThought[];
+  headIndex: number;
 }
 
 function normalizeInt(
@@ -28,7 +35,8 @@ function normalizeInt(
 
 export class ThinkingEngine {
   #thoughts: StoredThought[] = [];
-  #branches = new Map<string, StoredThought[]>();
+  #headIndex = 0;
+  #branches = new Map<string, BranchState>();
   #estimatedBytes = 0;
   #revisionCount = 0;
   readonly #maxThoughts: number;
@@ -70,12 +78,15 @@ export class ThinkingEngine {
     this.#estimatedBytes += this.#estimateThoughtBytes(stored);
     if (stored.isRevision) this.#revisionCount += 1;
     if (!stored.branchId) return;
-    const branch = this.#branches.get(stored.branchId);
-    if (branch) {
-      branch.push(stored);
+    const state = this.#branches.get(stored.branchId);
+    if (state) {
+      state.thoughts.push(stored);
       return;
     }
-    this.#branches.set(stored.branchId, [stored]);
+    this.#branches.set(stored.branchId, {
+      thoughts: [stored],
+      headIndex: 0,
+    });
   }
   #buildProcessResult(stored: StoredThought): ProcessResult {
     const context = this.#buildContextSummary();
@@ -86,15 +97,15 @@ export class ThinkingEngine {
         totalThoughts: stored.totalThoughts,
         progress: Math.min(1, stored.thoughtNumber / stored.totalThoughts),
         nextThoughtNeeded: stored.nextThoughtNeeded,
-        thoughtHistoryLength: this.#thoughts.length,
+        thoughtHistoryLength: this.#activeLength(),
         branches: Array.from(this.#branches.keys()),
         context,
       },
     };
   }
   #buildContextSummary(): ContextSummary {
-    const recent = this.#thoughts.slice(-5);
-    const currentBranch = this.#thoughts.at(-1)?.branchId;
+    const recent = this.#getRecentThoughts();
+    const currentBranch = this.#getLastThought()?.branchId;
     return {
       recentThoughts: recent.map((t) => {
         const base = {
@@ -108,8 +119,38 @@ export class ThinkingEngine {
       hasRevisions: this.#revisionCount > 0,
     };
   }
+  #activeLength(): number {
+    return this.#thoughts.length - this.#headIndex;
+  }
+  #getLastThought(): StoredThought | undefined {
+    return this.#activeLength() > 0 ? this.#thoughts.at(-1) : undefined;
+  }
+  #getRecentThoughts(): StoredThought[] {
+    const activeLength = this.#activeLength();
+    if (activeLength === 0) return [];
+    const start = Math.max(this.#headIndex, this.#thoughts.length - 5);
+    return this.#thoughts.slice(start);
+  }
+  #compactIfNeeded(force = false): void {
+    if (this.#headIndex === 0) return;
+    const activeLength = this.#activeLength();
+    if (activeLength === 0) {
+      this.#thoughts = [];
+      this.#headIndex = 0;
+      return;
+    }
+    if (
+      !force &&
+      this.#headIndex < COMPACT_THRESHOLD &&
+      this.#headIndex < this.#thoughts.length * COMPACT_RATIO
+    ) {
+      return;
+    }
+    this.#thoughts = this.#thoughts.slice(this.#headIndex);
+    this.#headIndex = 0;
+  }
   #validateThoughtNumber(input: ThoughtData): void {
-    const lastThought = this.#thoughts.at(-1);
+    const lastThought = this.#getLastThought();
     if (!lastThought) {
       if (input.thoughtNumber !== 1) {
         throw new Error(
@@ -131,7 +172,7 @@ export class ThinkingEngine {
     }
   }
   #validateReferences(input: ThoughtData): void {
-    const maxThoughtNumber = this.#thoughts.at(-1)?.thoughtNumber ?? 0;
+    const maxThoughtNumber = this.#getLastThought()?.thoughtNumber ?? 0;
     if (
       input.revisesThought !== undefined &&
       input.revisesThought > maxThoughtNumber
@@ -150,7 +191,7 @@ export class ThinkingEngine {
     }
   }
   #pruneHistoryIfNeeded(): void {
-    const excess = this.#thoughts.length - this.#maxThoughts;
+    const excess = this.#activeLength() - this.#maxThoughts;
     if (excess > 0) {
       const batch = Math.max(excess, Math.ceil(this.#maxThoughts * 0.1));
       this.#removeOldest(batch);
@@ -158,22 +199,25 @@ export class ThinkingEngine {
 
     if (
       this.#estimatedBytes > this.#maxMemoryBytes &&
-      this.#thoughts.length > 10
+      this.#activeLength() > 10
     ) {
-      const toRemove = Math.ceil(this.#thoughts.length * 0.2);
-      this.#removeOldest(toRemove);
+      const toRemove = Math.ceil(this.#activeLength() * 0.2);
+      this.#removeOldest(toRemove, { forceCompact: true });
     }
   }
   #estimateThoughtBytes(thought: StoredThought): number {
     return thought.thought.length * 2 + this.#estimatedThoughtOverheadBytes;
   }
-  #removeOldest(count: number): void {
-    if (count <= 0 || this.#thoughts.length === 0) return;
-    const actual = Math.min(count, this.#thoughts.length);
-    const removed = this.#thoughts.splice(0, actual);
-    if (removed.length === 0) return;
+  #removeOldest(count: number, options: { forceCompact?: boolean } = {}): void {
+    const activeLength = this.#activeLength();
+    if (count <= 0 || activeLength === 0) return;
+    const actual = Math.min(count, activeLength);
+    const start = this.#headIndex;
+    const end = start + actual;
     const branchRemovals = new Map<string, number>();
-    for (const thought of removed) {
+    for (let index = start; index < end; index += 1) {
+      const thought = this.#thoughts[index];
+      if (!thought) continue;
       this.#estimatedBytes -= this.#estimateThoughtBytes(thought);
       if (thought.isRevision) this.#revisionCount -= 1;
       if (!thought.branchId) continue;
@@ -182,17 +226,38 @@ export class ThinkingEngine {
         (branchRemovals.get(thought.branchId) ?? 0) + 1
       );
     }
+    this.#headIndex = end;
+    if (this.#activeLength() === 0) {
+      this.#thoughts = [];
+      this.#headIndex = 0;
+    } else {
+      this.#compactIfNeeded(options.forceCompact ?? false);
+    }
     for (const [branchId, removeCount] of branchRemovals) {
-      this.#trimBranch(branchId, removeCount);
+      this.#trimBranch(branchId, removeCount, options.forceCompact ?? false);
     }
   }
-  #trimBranch(branchId: string, removeCount: number): void {
+  #trimBranch(
+    branchId: string,
+    removeCount: number,
+    forceCompact: boolean
+  ): void {
     const branch = this.#branches.get(branchId);
     if (!branch) return;
-    if (removeCount >= branch.length) {
+    const activeLength = branch.thoughts.length - branch.headIndex;
+    if (removeCount >= activeLength) {
       this.#branches.delete(branchId);
       return;
     }
-    branch.splice(0, removeCount);
+    branch.headIndex += removeCount;
+    if (
+      !forceCompact &&
+      branch.headIndex < COMPACT_THRESHOLD &&
+      branch.headIndex < branch.thoughts.length * COMPACT_RATIO
+    ) {
+      return;
+    }
+    branch.thoughts = branch.thoughts.slice(branch.headIndex);
+    branch.headIndex = 0;
   }
 }
