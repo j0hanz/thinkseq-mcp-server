@@ -119,7 +119,7 @@ Add to your `~/.codeium/windsurf/mcp_config.json`:
 
 ## Tool: `thinkseq`
 
-Structured sequential thinking for complex problem solving.
+Record a thinking step. Use for multi-step reasoning where tracking progress matters.
 
 ### Input
 

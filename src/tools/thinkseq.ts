@@ -15,17 +15,11 @@ import { ThinkSeqOutputSchema } from '../schemas/outputs.js';
 
 const THINKSEQ_TOOL_DEFINITION = {
   title: 'Think Sequentially',
-  description: `Structured sequential thinking for complex problem solving.
+  description: `Record a thinking step. Use for multi-step reasoning where tracking progress matters.
 
-Use for:
-- Breaking down complex problems into steps
-- Multi-step reasoning and analysis
+Returns: progress (0-1) and last 5 thought previews for context.
 
-Key parameters:
-- thought: Current thinking step
-- thoughtNumber: Step number (starts at 1)
-- totalThoughts: Estimated total (adjustable)
-- nextThoughtNeeded: false only when done`,
+Set nextThoughtNeeded: false when done.`,
   inputSchema: ThinkSeqInputSchema,
   outputSchema: ThinkSeqOutputSchema,
 };
