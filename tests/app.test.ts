@@ -108,6 +108,7 @@ void describe('app.run', () => {
     assert.equal(harness.state.connectedServer, harness.state.server);
     assert.deepEqual(harness.state.shutdown, {
       server: harness.state.server,
+      engine: harness.state.engine,
       transport: harness.state.transport,
     });
   });
@@ -134,9 +135,10 @@ interface RunState {
   seenSignal?: AbortSignal;
   server: ServerLike;
   transport: TransportLike;
+  engine: { processThought: () => unknown };
   registeredServer?: ServerLike;
   connectedServer?: ServerLike;
-  shutdown?: { server: unknown; transport: unknown };
+  shutdown?: { server: unknown; engine: unknown; transport: unknown };
 }
 
 const createRunState = (): RunState => {
@@ -147,6 +149,7 @@ const createRunState = (): RunState => {
     seenSignal: undefined,
     server: createServerStub(),
     transport: createTransportStub(),
+    engine: { processThought: () => ({ ok: true, result: {} }) },
     registeredServer: undefined,
     connectedServer: undefined,
     shutdown: undefined,
@@ -177,9 +180,10 @@ const buildRunDependencies = (state: RunState): RunDependencies => {
       state.calls.push('register');
       state.registeredServer = server;
     },
-    installShutdownHandlers: ({ server, transport }) => {
+    engineFactory: () => state.engine as never,
+    installShutdownHandlers: ({ server, engine, transport }) => {
       state.calls.push('shutdown');
-      state.shutdown = { server, transport };
+      state.shutdown = { server, engine, transport };
     },
   };
 };

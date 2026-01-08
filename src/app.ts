@@ -1,7 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 
-import { ThinkingEngine } from './engine.js';
 import { publishLifecycleEvent } from './lib/diagnostics.js';
 import type { LifecycleEvent } from './lib/diagnostics.js';
 import type { PackageInfo } from './lib/package.js';
@@ -11,6 +10,8 @@ import {
   installStdioInvalidMessageGuards,
   installStdioParseErrorResponder,
 } from './lib/stdioGuards.js';
+import type { ProcessResult, ThoughtData } from './lib/types.js';
+import { WorkerEngineClient } from './lib/workerEngineClient.js';
 import { registerThinkSeq } from './tools/thinkseq.js';
 
 const SERVER_INSTRUCTIONS =
@@ -19,8 +20,15 @@ const SERVER_INSTRUCTIONS =
 const DEFAULT_PACKAGE_READ_TIMEOUT_MS = 2000;
 const DEFAULT_SHUTDOWN_TIMEOUT_MS = 5000;
 
-interface Closeable extends Record<string, unknown> {
-  close?: () => Promise<void> | void;
+type CloseFn = () => Promise<void> | void;
+
+function hasClose(value: unknown): value is { close: CloseFn } {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'close' in value &&
+    typeof (value as { close?: unknown }).close === 'function'
+  );
 }
 
 interface ProcessLike {
@@ -28,9 +36,21 @@ interface ProcessLike {
   exit: (code: number) => void;
 }
 
-type ServerLike = Pick<McpServer, 'connect' | 'registerTool'>;
-type TransportLike = Pick<StdioServerTransport, 'close'>;
-type EngineLike = Pick<ThinkingEngine, 'processThought'>;
+interface ServerLike {
+  connect: McpServer['connect'];
+  registerTool: McpServer['registerTool'];
+}
+
+interface TransportLike {
+  close: StdioServerTransport['close'];
+}
+
+interface EngineLike {
+  processThought: (
+    input: ThoughtData
+  ) => ProcessResult | Promise<ProcessResult>;
+  close?: CloseFn;
+}
 
 export interface ProcessErrorHandlerDeps {
   processLike?: ProcessLike;
@@ -40,8 +60,9 @@ export interface ProcessErrorHandlerDeps {
 
 interface ShutdownDependencies {
   processLike?: ProcessLike;
-  server: Closeable;
-  transport: Closeable;
+  server: unknown;
+  engine: unknown;
+  transport: unknown;
   publishLifecycleEvent?: (event: LifecycleEvent) => void;
   now?: () => number;
   shutdownTimeoutMs?: number;
@@ -110,14 +131,14 @@ const DEFAULT_RUN_DEPENDENCIES: ResolvedRunDependencies = {
   createServer,
   connectServer,
   registerTool: registerThinkSeq,
-  engineFactory: () => new ThinkingEngine(),
+  engineFactory: () => new WorkerEngineClient(),
   installShutdownHandlers,
   now: Date.now,
 };
 
-async function closeSafely(value: Closeable): Promise<void> {
+async function closeSafely(value: unknown): Promise<void> {
   try {
-    if (typeof value.close === 'function') {
+    if (hasClose(value)) {
       await value.close();
     }
   } catch {
@@ -126,7 +147,7 @@ async function closeSafely(value: Closeable): Promise<void> {
 }
 
 async function closeWithTimeout(
-  value: Closeable,
+  value: unknown,
   timeoutMs: number
 ): Promise<void> {
   const timeout = new Promise<void>((resolve) => {
@@ -138,6 +159,7 @@ async function closeWithTimeout(
 function installShutdownHandlers({
   processLike,
   server,
+  engine,
   transport,
   publishLifecycleEvent: publishLifecycle,
   now,
@@ -160,6 +182,7 @@ function installShutdownHandlers({
     });
 
     await closeWithTimeout(server, timeoutMs);
+    await closeWithTimeout(engine, timeoutMs);
     await closeWithTimeout(transport, timeoutMs);
     proc.exit(0);
   };
@@ -198,6 +221,7 @@ export async function run(deps: RunDependencies = {}): Promise<void> {
   resolved.installShutdownHandlers({
     processLike: resolved.processLike,
     server,
+    engine,
     transport,
     publishLifecycleEvent: resolved.publishLifecycleEvent,
     now: resolved.now,

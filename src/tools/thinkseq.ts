@@ -29,8 +29,17 @@ Key parameters:
   outputSchema: ThinkSeqOutputSchema,
 };
 
-type ToolRegistrar = Pick<McpServer, 'registerTool'>;
-type EngineLike = Pick<ThinkingEngine, 'processThought'>;
+interface ToolRegistrar {
+  registerTool: McpServer['registerTool'];
+}
+
+interface EngineLike {
+  processThought: (
+    input: ThoughtData
+  ) =>
+    | ReturnType<ThinkingEngine['processThought']>
+    | Promise<ReturnType<ThinkingEngine['processThought']>>;
+}
 type ThinkSeqInput = z.input<typeof ThinkSeqInputSchema>;
 
 function getContextFields(input: ThinkSeqInput): Partial<ThoughtData> {
@@ -67,7 +76,7 @@ export function registerThinkSeq(
   server: ToolRegistrar,
   engine: EngineLike
 ): void {
-  server.registerTool('thinkseq', THINKSEQ_TOOL_DEFINITION, (input) => {
+  server.registerTool('thinkseq', THINKSEQ_TOOL_DEFINITION, async (input) => {
     const normalized = normalizeThoughtInput(input);
     publishToolEvent({
       type: 'tool.start',
@@ -76,7 +85,7 @@ export function registerThinkSeq(
     });
     const start = performance.now();
     try {
-      const result = engine.processThought(normalized);
+      const result = await engine.processThought(normalized);
       const durationMs = Math.max(0, performance.now() - start);
       publishToolEvent({
         type: 'tool.end',

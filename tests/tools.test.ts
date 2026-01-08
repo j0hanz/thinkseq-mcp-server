@@ -18,11 +18,17 @@ type StructuredResponse = ProcessResult | ErrorResponse['structuredContent'];
 interface RegisteredTool {
   name: string;
   definition: unknown;
-  handler: (input: ThoughtData) => {
-    content: { type: 'text'; text: string }[];
-    structuredContent: StructuredResponse;
-    isError?: boolean;
-  };
+  handler: (input: ThoughtData) =>
+    | {
+        content: { type: 'text'; text: string }[];
+        structuredContent: StructuredResponse;
+        isError?: boolean;
+      }
+    | Promise<{
+        content: { type: 'text'; text: string }[];
+        structuredContent: StructuredResponse;
+        isError?: boolean;
+      }>;
 }
 
 class FakeServer {
@@ -75,7 +81,7 @@ void describe('tools.registerThinkSeq metadata', () => {
 });
 
 void describe('tools.registerThinkSeq handler success', () => {
-  void it('returns a tool response on success', () => {
+  void it('returns a tool response on success', async () => {
     const server = new FakeServer();
     const engine = {
       processThought: (input: ThoughtData): ProcessResult => ({
@@ -96,7 +102,7 @@ void describe('tools.registerThinkSeq handler success', () => {
     assert.ok(server.registered);
 
     const input = createThoughtInput();
-    const response = server.registered.handler(input);
+    const response = await server.registered.handler(input);
 
     assert.deepEqual(response.structuredContent.ok, true);
     assert.equal(response.isError, undefined);
@@ -112,8 +118,7 @@ void describe('tools.registerThinkSeq diagnostics durationMs (success)', () => {
     const { messages } = captureDiagnostics(t, 'thinkseq:tool');
 
     const handler = registerThinkSeqForTests(createOkEngine());
-    handler(createThoughtInput());
-    await Promise.resolve();
+    await handler(createThoughtInput());
 
     assertToolMessagesHaveDuration(messages, true);
   });
@@ -124,15 +129,14 @@ void describe('tools.registerThinkSeq diagnostics durationMs (error)', () => {
     const { messages } = captureDiagnostics(t, 'thinkseq:tool');
 
     const handler = registerThinkSeqForTests(createThrowingEngine());
-    handler(createThoughtInput());
-    await Promise.resolve();
+    await handler(createThoughtInput());
 
     assertToolMessagesHaveDuration(messages, false);
   });
 });
 
 void describe('tools.registerThinkSeq handler error', () => {
-  void it('returns an error response on failure', () => {
+  void it('returns an error response on failure', async () => {
     const server = new FakeServer();
     const engine = {
       processThought: () => {
@@ -145,7 +149,7 @@ void describe('tools.registerThinkSeq handler error', () => {
 
     const input = createThoughtInput();
 
-    const response = server.registered.handler(input);
+    const response = await server.registered.handler(input);
     assert.equal(response.isError, true);
     assert.deepEqual(response.structuredContent.ok, false);
     assert.deepEqual(response.structuredContent.error.code, 'E_THINK');
