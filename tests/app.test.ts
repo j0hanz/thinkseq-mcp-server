@@ -53,6 +53,23 @@ void describe('app.installProcessErrorHandlers', () => {
     assert.deepEqual(exitCodes, [1, 1]);
     assert.deepEqual(proc.exitCodes, []);
   });
+
+  void it('uses process exit when exit handler not provided', () => {
+    const proc = createProcessStub();
+    const logs: string[] = [];
+
+    installProcessErrorHandlers({
+      processLike: proc,
+      logError: (message) => logs.push(message),
+    });
+
+    const unhandled = proc.handlers.get('unhandledRejection');
+    assert.ok(unhandled);
+    unhandled('oops');
+
+    assert.deepEqual(proc.exitCodes, [1]);
+    assert.deepEqual(logs, ['thinkseq: unhandledRejection: oops']);
+  });
 });
 
 void describe('app.run', () => {
