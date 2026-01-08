@@ -2,7 +2,7 @@ import diagnosticsChannel from 'node:diagnostics_channel';
 
 import { getRequestContext } from './context.js';
 
-export interface EventContext {
+interface EventContext {
   requestId: string;
   startedAt: number;
 }

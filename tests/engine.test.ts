@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
-import diagnostics_channel from 'node:diagnostics_channel';
 import { describe, it } from 'node:test';
-import type { TestContext } from 'node:test';
 
 import { ThinkingEngine } from '../src/engine.js';
 import type { ThoughtData } from '../src/lib/types.js';
+import {
+  assertSequenceGapMessage,
+  captureDiagnostics,
+} from './helpers/diagnostics.js';
 
 void describe('ThinkingEngine.basic', () => {
   void it('should process a simple thought', () => {
@@ -101,13 +103,7 @@ void describe('ThinkingEngine.sequence', () => {
 
 void describe('ThinkingEngine.references.revisesThought', () => {
   void it('should reject revisesThought referencing non-existent thought', () => {
-    const engine = new ThinkingEngine();
-    engine.processThought({
-      thought: 'First',
-      thoughtNumber: 1,
-      totalThoughts: 3,
-      nextThoughtNeeded: true,
-    });
+    const engine = createSeededEngine();
 
     assert.throws(() => {
       engine.processThought({
@@ -122,13 +118,7 @@ void describe('ThinkingEngine.references.revisesThought', () => {
   });
 
   void it('should allow valid revisesThought reference', () => {
-    const engine = new ThinkingEngine();
-    engine.processThought({
-      thought: 'First',
-      thoughtNumber: 1,
-      totalThoughts: 3,
-      nextThoughtNeeded: true,
-    });
+    const engine = createSeededEngine();
 
     const result = engine.processThought({
       thought: 'Valid revision of thought 1',
@@ -144,13 +134,7 @@ void describe('ThinkingEngine.references.revisesThought', () => {
 
 void describe('ThinkingEngine.references.branchFromThought', () => {
   void it('should reject branchFromThought referencing non-existent thought', () => {
-    const engine = new ThinkingEngine();
-    engine.processThought({
-      thought: 'First',
-      thoughtNumber: 1,
-      totalThoughts: 3,
-      nextThoughtNeeded: true,
-    });
+    const engine = createSeededEngine();
 
     assert.throws(() => {
       engine.processThought({
@@ -246,47 +230,72 @@ void describe('ThinkingEngine.pruning', () => {
     assert.ok(result.result.thoughtHistoryLength < 12);
     assert.ok(result.result.branches.includes('branch-a'));
   });
+
+  void it('removes empty branches when all thoughts pruned', () => {
+    const engine = new ThinkingEngine({ maxThoughts: 2 });
+    engine.processThought({
+      thought: 'Branch seed',
+      thoughtNumber: 1,
+      totalThoughts: 3,
+      nextThoughtNeeded: true,
+      branchId: 'branch-a',
+    });
+    engine.processThought({
+      thought: 'Second',
+      thoughtNumber: 2,
+      totalThoughts: 3,
+      nextThoughtNeeded: true,
+    });
+
+    const result = engine.processThought({
+      thought: 'Third',
+      thoughtNumber: 3,
+      totalThoughts: 3,
+      nextThoughtNeeded: false,
+    });
+
+    assert.ok(result.ok);
+    assert.equal(result.result.branches.includes('branch-a'), false);
+  });
+
+  void it('clears revision flag after pruning last revision', () => {
+    const engine = new ThinkingEngine({ maxThoughts: 1 });
+    engine.processThought({
+      thought: 'Initial',
+      thoughtNumber: 1,
+      totalThoughts: 3,
+      nextThoughtNeeded: true,
+    });
+    engine.processThought({
+      thought: 'Revision',
+      thoughtNumber: 2,
+      totalThoughts: 3,
+      nextThoughtNeeded: true,
+      isRevision: true,
+      revisesThought: 1,
+    });
+
+    const result = engine.processThought({
+      thought: 'Third',
+      thoughtNumber: 3,
+      totalThoughts: 3,
+      nextThoughtNeeded: false,
+    });
+
+    assert.ok(result.ok);
+    assert.equal(result.result.context.hasRevisions, false);
+  });
 });
 
-interface DiagnosticsCapture {
-  messages: unknown[];
-}
-
-function captureDiagnostics(
-  t: TestContext,
-  channel: string
-): DiagnosticsCapture {
-  const messages: unknown[] = [];
-  const handler = (message: unknown): void => {
-    messages.push(message);
-  };
-
-  diagnostics_channel.subscribe(channel, handler);
-  t.after(() => diagnostics_channel.unsubscribe(channel, handler));
-
-  return { messages };
-}
-
-function assertSequenceGapMessage(
-  messages: unknown[],
-  expected: number,
-  received: number
-): void {
-  const msg = getSingleMessage(messages);
-  assert.equal(msg.type, 'engine.sequence_gap');
-  assert.equal(msg.expected, expected);
-  assert.equal(msg.received, received);
-}
-
-function getSingleMessage(messages: unknown[]): Record<string, unknown> {
-  assert.equal(messages.length, 1);
-  const msg = messages[0];
-  assert.ok(isRecord(msg));
-  return msg;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
+function createSeededEngine(): ThinkingEngine {
+  const engine = new ThinkingEngine();
+  engine.processThought({
+    thought: 'First',
+    thoughtNumber: 1,
+    totalThoughts: 3,
+    nextThoughtNeeded: true,
+  });
+  return engine;
 }
 
 function buildNumberedThoughts(

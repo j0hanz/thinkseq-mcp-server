@@ -8,6 +8,11 @@ import {
   publishLifecycleEvent,
   publishToolEvent,
 } from '../src/lib/diagnostics.js';
+import {
+  assertSequenceGapMessage,
+  captureDiagnostics,
+  getSingleMessage,
+} from './helpers/diagnostics.js';
 
 void describe('publishToolEvent.basic', () => {
   void it('does not throw without subscribers', () => {
@@ -154,44 +159,3 @@ const withPublishFailure = (
   });
   action();
 };
-
-interface DiagnosticsCapture {
-  messages: unknown[];
-}
-
-function captureDiagnostics(
-  t: TestContext,
-  channel: string
-): DiagnosticsCapture {
-  const messages: unknown[] = [];
-  const handler = (message: unknown): void => {
-    messages.push(message);
-  };
-
-  diagnostics_channel.subscribe(channel, handler);
-  t.after(() => diagnostics_channel.unsubscribe(channel, handler));
-
-  return { messages };
-}
-
-function assertSequenceGapMessage(
-  messages: unknown[],
-  expected: number,
-  received: number
-): void {
-  const msg = getSingleMessage(messages);
-  assert.equal(msg.type, 'engine.sequence_gap');
-  assert.equal(msg.expected, expected);
-  assert.equal(msg.received, received);
-}
-
-function getSingleMessage(messages: unknown[]): Record<string, unknown> {
-  assert.equal(messages.length, 1);
-  const msg = messages[0];
-  assert.ok(isRecord(msg));
-  return msg;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}

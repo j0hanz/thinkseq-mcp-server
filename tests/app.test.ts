@@ -77,6 +77,17 @@ void describe('app.run', () => {
       transport: state.transport,
     });
   });
+
+  void it('passes shutdown timeout when provided', async () => {
+    const state = createRunState();
+
+    await run({
+      ...buildRunDependencies(state),
+      shutdownTimeoutMs: 1234,
+    });
+
+    assert.equal(state.shutdown?.shutdownTimeoutMs, 1234);
+  });
 });
 
 type RunState = {
@@ -96,7 +107,12 @@ type RunState = {
   engine: { processThought: () => unknown };
   registeredServer?: RunState['server'];
   connectedServer?: RunState['server'];
-  shutdown?: { server: unknown; engine: unknown; transport: unknown };
+  shutdown?: {
+    server: unknown;
+    engine: unknown;
+    transport: unknown;
+    shutdownTimeoutMs?: number;
+  };
 };
 
 const createRunState = (): RunState => {
@@ -151,13 +167,20 @@ const buildRunDependencies = (state: RunState) => {
       server,
       engine,
       transport,
+      shutdownTimeoutMs,
     }: {
       server: unknown;
       engine: unknown;
       transport: unknown;
+      shutdownTimeoutMs?: number;
     }) => {
       state.calls.push('shutdown');
-      state.shutdown = { server, engine, transport };
+      state.shutdown = {
+        server,
+        engine,
+        transport,
+        ...(shutdownTimeoutMs !== undefined && { shutdownTimeoutMs }),
+      };
     },
   };
 };

@@ -22,7 +22,8 @@ const buildEngineOptions = (config: {
   maxMemoryBytes?: number;
 }): ThinkingEngineOptions => {
   const options: ThinkingEngineOptions = {};
-  if (config.maxThoughts !== undefined) options.maxThoughts = config.maxThoughts;
+  if (config.maxThoughts !== undefined)
+    options.maxThoughts = config.maxThoughts;
   if (config.maxMemoryBytes !== undefined)
     options.maxMemoryBytes = config.maxMemoryBytes;
   return options;

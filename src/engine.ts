@@ -1,3 +1,13 @@
+import { collectRemovalStats } from './engine/pruning.js';
+import {
+  COMPACT_RATIO,
+  COMPACT_THRESHOLD,
+  DEFAULT_MAX_THOUGHTS,
+  ESTIMATED_THOUGHT_OVERHEAD_BYTES,
+  MAX_MEMORY_BYTES,
+  MAX_THOUGHTS_CAP,
+  normalizeInt,
+} from './engineConfig.js';
 import { publishEngineEvent } from './lib/diagnostics.js';
 import type {
   ContextSummary,
@@ -5,13 +15,6 @@ import type {
   StoredThought,
   ThoughtData,
 } from './lib/types.js';
-
-const DEFAULT_MAX_THOUGHTS = 500;
-const MAX_THOUGHTS_CAP = 10000;
-const MAX_MEMORY_BYTES = 100 * 1024 * 1024;
-const ESTIMATED_THOUGHT_OVERHEAD_BYTES = 200;
-const COMPACT_THRESHOLD = 1024;
-const COMPACT_RATIO = 0.5;
 
 export interface ThinkingEngineOptions {
   maxThoughts?: number;
@@ -22,15 +25,6 @@ export interface ThinkingEngineOptions {
 interface BranchState {
   thoughts: StoredThought[];
   headIndex: number;
-}
-
-function normalizeInt(
-  value: number | undefined,
-  fallback: number,
-  options: { min: number; max: number }
-): number {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
-  return Math.max(options.min, Math.min(options.max, Math.trunc(value)));
 }
 
 export class ThinkingEngine {
@@ -214,27 +208,22 @@ export class ThinkingEngine {
     const actual = Math.min(count, activeLength);
     const start = this.#headIndex;
     const end = start + actual;
-    const branchRemovals = new Map<string, number>();
-    for (let index = start; index < end; index += 1) {
-      const thought = this.#thoughts[index];
-      if (!thought) continue;
-      this.#estimatedBytes -= this.#estimateThoughtBytes(thought);
-      if (thought.isRevision) this.#revisionCount -= 1;
-      if (!thought.branchId) continue;
-      branchRemovals.set(
-        thought.branchId,
-        (branchRemovals.get(thought.branchId) ?? 0) + 1
+    const forceCompact = options.forceCompact ?? false;
+    const { branchRemovals, removedBytes, removedRevisions } =
+      collectRemovalStats(this.#thoughts, start, end, (thought) =>
+        this.#estimateThoughtBytes(thought)
       );
-    }
+    this.#estimatedBytes -= removedBytes;
+    this.#revisionCount -= removedRevisions;
     this.#headIndex = end;
     if (this.#activeLength() === 0) {
       this.#thoughts = [];
       this.#headIndex = 0;
     } else {
-      this.#compactIfNeeded(options.forceCompact ?? false);
+      this.#compactIfNeeded(forceCompact);
     }
     for (const [branchId, removeCount] of branchRemovals) {
-      this.#trimBranch(branchId, removeCount, options.forceCompact ?? false);
+      this.#trimBranch(branchId, removeCount, forceCompact);
     }
   }
   #trimBranch(

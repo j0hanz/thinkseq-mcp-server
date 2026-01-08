@@ -1,6 +1,6 @@
 import { parseArgs, type ParseArgsConfig } from 'node:util';
 
-export interface CliConfig {
+interface CliConfig {
   maxThoughts?: number;
   maxMemoryBytes?: number;
   shutdownTimeoutMs?: number;
@@ -34,10 +34,8 @@ Options:
   --package-read-timeout-ms <number>  Package.json read timeout
   -h, --help                       Show this help`;
 
-type ParsedValues = Record<
-  string,
-  string | boolean | (string | boolean)[] | undefined
->;
+type ParsedValues = ReturnType<typeof parseArgs<typeof PARSE_CONFIG>>['values'];
+const BYTES_PER_MB = 1024 * 1024;
 
 function parsePositiveInt(
   value: string | undefined,
@@ -53,9 +51,50 @@ function parsePositiveInt(
 
 function getParsedValues(args?: readonly string[]): ParsedValues {
   if (args) {
-    return parseArgs({ ...PARSE_CONFIG, args }).values as ParsedValues;
+    return parseArgs({ ...PARSE_CONFIG, args }).values;
   }
-  return parseArgs(PARSE_CONFIG).values as ParsedValues;
+  return parseArgs(PARSE_CONFIG).values;
+}
+
+function getStringOption(
+  values: ParsedValues,
+  key: keyof ParsedValues
+): string | undefined {
+  const value = values[key];
+  return typeof value === 'string' ? value : undefined;
+}
+
+function buildCliConfig(values: ParsedValues): CliConfig {
+  const maxThoughts = parsePositiveInt(
+    getStringOption(values, 'max-thoughts'),
+    'max-thoughts'
+  );
+  const maxMemoryMb = parsePositiveInt(
+    getStringOption(values, 'max-memory-mb'),
+    'max-memory-mb'
+  );
+  const shutdownTimeoutMs = parsePositiveInt(
+    getStringOption(values, 'shutdown-timeout-ms'),
+    'shutdown-timeout-ms'
+  );
+  const packageReadTimeoutMs = parsePositiveInt(
+    getStringOption(values, 'package-read-timeout-ms'),
+    'package-read-timeout-ms'
+  );
+
+  const config: CliConfig = {};
+  if (maxThoughts !== undefined) config.maxThoughts = maxThoughts;
+  if (maxMemoryMb !== undefined) {
+    config.maxMemoryBytes = maxMemoryMb * BYTES_PER_MB;
+  }
+  if (shutdownTimeoutMs !== undefined) {
+    config.shutdownTimeoutMs = shutdownTimeoutMs;
+  }
+  if (packageReadTimeoutMs !== undefined) {
+    config.packageReadTimeoutMs = packageReadTimeoutMs;
+  }
+
+  return config;
 }
 
 export function getCliHelpText(): string {
@@ -64,40 +103,8 @@ export function getCliHelpText(): string {
 
 export function parseCliConfig(args?: readonly string[]): CliParseResult {
   const values = getParsedValues(args);
-  const maxThoughts = parsePositiveInt(
-    typeof values['max-thoughts'] === 'string'
-      ? values['max-thoughts']
-      : undefined,
-    'max-thoughts'
-  );
-  const maxMemoryMb = parsePositiveInt(
-    typeof values['max-memory-mb'] === 'string'
-      ? values['max-memory-mb']
-      : undefined,
-    'max-memory-mb'
-  );
-  const shutdownTimeoutMs = parsePositiveInt(
-    typeof values['shutdown-timeout-ms'] === 'string'
-      ? values['shutdown-timeout-ms']
-      : undefined,
-    'shutdown-timeout-ms'
-  );
-  const packageReadTimeoutMs = parsePositiveInt(
-    typeof values['package-read-timeout-ms'] === 'string'
-      ? values['package-read-timeout-ms']
-      : undefined,
-    'package-read-timeout-ms'
-  );
-
   return {
     help: values.help === true,
-    config: {
-      ...(maxThoughts !== undefined ? { maxThoughts } : {}),
-      ...(maxMemoryMb !== undefined
-        ? { maxMemoryBytes: maxMemoryMb * 1024 * 1024 }
-        : {}),
-      ...(shutdownTimeoutMs !== undefined ? { shutdownTimeoutMs } : {}),
-      ...(packageReadTimeoutMs !== undefined ? { packageReadTimeoutMs } : {}),
-    },
+    config: buildCliConfig(values),
   };
 }

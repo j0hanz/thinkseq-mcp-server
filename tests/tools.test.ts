@@ -1,7 +1,5 @@
 import assert from 'node:assert/strict';
-import diagnostics_channel from 'node:diagnostics_channel';
 import { describe, it } from 'node:test';
-import type { TestContext } from 'node:test';
 
 import type { ThinkingEngine } from '../src/engine.js';
 import type { ErrorResponse } from '../src/lib/errors.js';
@@ -10,6 +8,7 @@ import type { ProcessResult } from '../src/lib/types.js';
 import { ThinkSeqInputSchema } from '../src/schemas/inputs.js';
 import { ThinkSeqOutputSchema } from '../src/schemas/outputs.js';
 import { registerThinkSeq } from '../src/tools/thinkseq.js';
+import { captureDiagnostics } from './helpers/diagnostics.js';
 
 type StructuredResponse = ProcessResult | ErrorResponse['structuredContent'];
 type ToolRegistrar = Parameters<typeof registerThinkSeq>[0];
@@ -53,18 +52,7 @@ void describe('tools.registerThinkSeq metadata', () => {
   void it('registers tool metadata and schemas', () => {
     const server = new FakeServer();
     const engine = {
-      processThought: () => ({
-        ok: true,
-        result: {
-          thoughtNumber: 1,
-          totalThoughts: 1,
-          progress: 1,
-          nextThoughtNeeded: false,
-          thoughtHistoryLength: 1,
-          branches: [],
-          context: { recentThoughts: [], hasRevisions: false },
-        },
-      }),
+      processThought: () => buildSuccessResult(),
     } satisfies Pick<ThinkingEngine, 'processThought'>;
 
     registerThinkSeq(server, engine);
@@ -83,18 +71,13 @@ void describe('tools.registerThinkSeq handler success', () => {
   void it('returns a tool response on success', async () => {
     const server = new FakeServer();
     const engine = {
-      processThought: (input: ThoughtData): ProcessResult => ({
-        ok: true,
-        result: {
+      processThought: (input: ThoughtData): ProcessResult =>
+        buildSuccessResult({
           thoughtNumber: input.thoughtNumber,
           totalThoughts: input.totalThoughts,
           progress: input.thoughtNumber / input.totalThoughts,
           nextThoughtNeeded: input.nextThoughtNeeded,
-          thoughtHistoryLength: 1,
-          branches: [],
-          context: { recentThoughts: [], hasRevisions: false },
-        },
-      }),
+        }),
     };
 
     registerThinkSeq(server, engine);
@@ -119,18 +102,12 @@ void describe('tools.registerThinkSeq optional fields', () => {
     const engine = {
       processThought: (input: ThoughtData): ProcessResult => {
         seen = input;
-        return {
-          ok: true,
-          result: {
-            thoughtNumber: input.thoughtNumber,
-            totalThoughts: input.totalThoughts,
-            progress: input.thoughtNumber / input.totalThoughts,
-            nextThoughtNeeded: input.nextThoughtNeeded,
-            thoughtHistoryLength: 1,
-            branches: [],
-            context: { recentThoughts: [], hasRevisions: false },
-          },
-        };
+        return buildSuccessResult({
+          thoughtNumber: input.thoughtNumber,
+          totalThoughts: input.totalThoughts,
+          progress: input.thoughtNumber / input.totalThoughts,
+          nextThoughtNeeded: input.nextThoughtNeeded,
+        });
       },
     };
 
@@ -163,7 +140,7 @@ void describe('tools.registerThinkSeq diagnostics durationMs (success)', () => {
     const handler = registerThinkSeqForTests(createOkEngine());
     await handler(createThoughtInput());
 
-    assertToolMessagesHaveDuration(messages, true);
+    assertToolMessagesHaveDurationSuccess(messages);
   });
 });
 
@@ -185,7 +162,7 @@ void describe('tools.registerThinkSeq diagnostics durationMs (error)', () => {
     const handler = registerThinkSeqForTests(createThrowingEngine());
     await handler(createThoughtInput());
 
-    assertToolMessagesHaveDuration(messages, false);
+    assertToolMessagesHaveDurationError(messages);
   });
 });
 
@@ -214,44 +191,32 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-interface DiagnosticsCapture {
-  messages: unknown[];
-}
-
-function captureDiagnostics(
-  t: TestContext,
-  channel: string
-): DiagnosticsCapture {
-  const messages: unknown[] = [];
-  const handler = (message: unknown): void => {
-    messages.push(message);
-  };
-
-  diagnostics_channel.subscribe(channel, handler);
-  t.after(() => diagnostics_channel.unsubscribe(channel, handler));
-
-  return { messages };
-}
-
 function getMessageRecord(message: unknown): Record<string, unknown> {
   assert.ok(isRecord(message));
   return message;
 }
 
+function buildSuccessResult(
+  overrides: Partial<ProcessResult['result']> = {}
+): ProcessResult {
+  return {
+    ok: true,
+    result: {
+      thoughtNumber: 1,
+      totalThoughts: 1,
+      progress: 1,
+      nextThoughtNeeded: false,
+      thoughtHistoryLength: 1,
+      branches: [],
+      context: { recentThoughts: [], hasRevisions: false },
+      ...overrides,
+    },
+  };
+}
+
 function createOkEngine(): Pick<ThinkingEngine, 'processThought'> {
   return {
-    processThought: (): ProcessResult => ({
-      ok: true,
-      result: {
-        thoughtNumber: 1,
-        totalThoughts: 1,
-        progress: 1,
-        nextThoughtNeeded: false,
-        thoughtHistoryLength: 1,
-        branches: [],
-        context: { recentThoughts: [], hasRevisions: false },
-      },
-    }),
+    processThought: (): ProcessResult => buildSuccessResult(),
   };
 }
 
@@ -272,23 +237,31 @@ function registerThinkSeqForTests(
   return server.registered.handler;
 }
 
-function assertToolMessagesHaveDuration(
-  messages: unknown[],
-  ok: boolean
-): void {
+function assertToolMessagesHaveDurationSuccess(messages: unknown[]): void {
   assert.equal(messages.length, 2);
   const start = getMessageRecord(messages[0]);
   const end = getMessageRecord(messages[1]);
 
   assert.equal(start.type, 'tool.start');
   assert.equal(end.type, 'tool.end');
-  assert.equal(end.ok, ok);
+  assert.equal(end.ok, true);
 
-  if (!ok) {
-    assert.equal(end.errorCode, 'E_THINK');
-    assert.ok(typeof end.errorMessage === 'string');
-    assert.ok(end.errorMessage.length > 0);
-  }
+  assert.ok(typeof end.durationMs === 'number');
+  assert.ok(Number.isFinite(end.durationMs));
+  assert.ok(end.durationMs >= 0);
+}
+
+function assertToolMessagesHaveDurationError(messages: unknown[]): void {
+  assert.equal(messages.length, 2);
+  const start = getMessageRecord(messages[0]);
+  const end = getMessageRecord(messages[1]);
+
+  assert.equal(start.type, 'tool.start');
+  assert.equal(end.type, 'tool.end');
+  assert.equal(end.ok, false);
+  assert.equal(end.errorCode, 'E_THINK');
+  assert.ok(typeof end.errorMessage === 'string');
+  assert.ok(end.errorMessage.length > 0);
 
   assert.ok(typeof end.durationMs === 'number');
   assert.ok(Number.isFinite(end.durationMs));
@@ -309,7 +282,9 @@ function assertToolMessagesHaveContext(messages: unknown[]): void {
   assert.equal(startContext.startedAt, endContext.startedAt);
 }
 
-function getContextRecord(message: Record<string, unknown>): Record<string, unknown> {
+function getContextRecord(
+  message: Record<string, unknown>
+): Record<string, unknown> {
   const context = message.context;
   assert.ok(isRecord(context));
   assert.equal(typeof context.requestId, 'string');
