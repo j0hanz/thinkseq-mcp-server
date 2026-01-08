@@ -123,12 +123,12 @@ Structured sequential thinking for complex problem solving.
 
 ### Input
 
-| Field               | Type    | Required | Description                                       |
-| :------------------ | :------ | :------: | :------------------------------------------------ |
-| `thought`           | string  |   yes    | Current thinking step (1 to 50000 chars).         |
-| `thoughtNumber`     | number  |   yes    | Current thought number in sequence (1 to 10000).  |
-| `totalThoughts`     | number  |   yes    | Estimated total thoughts needed (1 to 10000).     |
-| `nextThoughtNeeded` | boolean |   yes    | Whether another thought step is needed.           |
+| Field               | Type    | Required | Description                                      |
+| :------------------ | :------ | :------: | :----------------------------------------------- |
+| `thought`           | string  |   yes    | Current thinking step (1 to 50000 chars).        |
+| `thoughtNumber`     | number  |   yes    | Current thought number in sequence (1 to 10000). |
+| `totalThoughts`     | number  |   yes    | Estimated total thoughts needed (1 to 10000).    |
+| `nextThoughtNeeded` | boolean |   yes    | Whether another thought step is needed.          |
 
 ### Output
 
@@ -139,19 +139,19 @@ The tool returns JSON with a success or error shape:
 
 Result fields:
 
-| Field                  | Type   | Description                                          |
-| :--------------------- | :----- | :--------------------------------------------------- |
-| `thoughtNumber`        | number | Stored thought number.                               |
-| `totalThoughts`        | number | Effective total thoughts (at least `thoughtNumber`). |
-| `progress`             | number | `thoughtNumber / totalThoughts` (0 to 1).            |
-| `nextThoughtNeeded`    | boolean| Mirrors input.                                       |
-| `thoughtHistoryLength` | number | Stored thought count after pruning.                  |
-| `context`              | object | Recent context summary (see below).                  |
+| Field                  | Type    | Description                                          |
+| :--------------------- | :------ | :--------------------------------------------------- |
+| `thoughtNumber`        | number  | Stored thought number.                               |
+| `totalThoughts`        | number  | Effective total thoughts (at least `thoughtNumber`). |
+| `progress`             | number  | `thoughtNumber / totalThoughts` (0 to 1).            |
+| `nextThoughtNeeded`    | boolean | Mirrors input.                                       |
+| `thoughtHistoryLength` | number  | Stored thought count after pruning.                  |
+| `context`              | object  | Recent context summary (see below).                  |
 
 Context fields:
 
-| Field            | Type  | Description                                       |
-| :--------------- | :---- | :------------------------------------------------ |
+| Field            | Type  | Description                                            |
+| :--------------- | :---- | :----------------------------------------------------- |
 | `recentThoughts` | array | Up to the last 5 thoughts with `number` and `preview`. |
 
 ### Example
