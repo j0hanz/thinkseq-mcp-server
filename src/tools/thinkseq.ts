@@ -15,11 +15,13 @@ import { ThinkSeqOutputSchema } from '../schemas/outputs.js';
 
 const THINKSEQ_TOOL_DEFINITION = {
   title: 'Think Sequentially',
-  description: `Record a thinking step. Use for multi-step reasoning where tracking progress matters.
+  description: `Record a concise thinking step (max 2000 chars). Be brief: capture only the essential insight, calculation, or decision.
 
-Returns: progress (0-1) and last 5 thought previews for context.
+REVISION: If you realize an earlier step was wrong or want to try a different approach, use \`revisesThought\` to correct it. Both versions are preserved for audit.
 
-Set nextThoughtNeeded: false when done.`,
+Example: { "thought": "Better approach: use caching", "revisesThought": 3 }
+
+Returns: thoughtNumber, progress (0-1), isComplete, revisableThoughts, and recent thought previews.`,
   inputSchema: ThinkSeqInputSchema,
   outputSchema: ThinkSeqOutputSchema,
 };
@@ -35,12 +37,33 @@ interface EngineLike {
     | ReturnType<ThinkingEngine['processThought']>
     | Promise<ReturnType<ThinkingEngine['processThought']>>;
 }
-type ThinkSeqInput = z.input<typeof ThinkSeqInputSchema>;
+
+type ThinkSeqInput = z.infer<z.ZodObject<typeof ThinkSeqInputSchema>>;
+
+interface StructuredResult {
+  [x: string]: unknown;
+  thoughtNumber: number;
+  totalThoughts: number;
+  progress: number;
+  isComplete: boolean;
+  thoughtHistoryLength: number;
+  hasRevisions: boolean;
+  activePathLength: number;
+  revisableThoughts: number[];
+  context: {
+    recentThoughts: readonly { number: number; preview: string }[];
+    revisionInfo?: {
+      revises: number;
+      supersedes: number[];
+    };
+  };
+}
+
 type ToolResponse =
   | ErrorResponse
   | {
       content: { type: 'text'; text: string }[];
-      structuredContent: ProcessResult;
+      structuredContent: StructuredResult;
     };
 
 function publishToolStart(): void {
@@ -74,9 +97,12 @@ function publishToolFailure(errorMessage: string, durationMs: number): void {
 }
 
 function buildSuccessResponse(result: ProcessResult): ToolResponse {
+  if (!result.ok) {
+    return createErrorResponse(result.error.code, result.error.message);
+  }
   return {
-    content: [{ type: 'text', text: JSON.stringify(result) }],
-    structuredContent: result,
+    content: [{ type: 'text', text: JSON.stringify(result.result) }],
+    structuredContent: result.result,
   };
 }
 
@@ -91,9 +117,10 @@ async function handleThinkSeq(
   return runWithContext(async () => {
     const normalized: ThoughtData = {
       thought: input.thought,
-      thoughtNumber: input.thoughtNumber,
       totalThoughts: input.totalThoughts,
-      nextThoughtNeeded: input.nextThoughtNeeded,
+      ...(input.revisesThought !== undefined && {
+        revisesThought: input.revisesThought,
+      }),
     };
     publishToolStart();
     const start = performance.now();

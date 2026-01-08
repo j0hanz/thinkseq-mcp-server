@@ -119,51 +119,50 @@ Add to your `~/.codeium/windsurf/mcp_config.json`:
 
 ## Tool: `thinkseq`
 
-Record a thinking step. Use for multi-step reasoning where tracking progress matters.
+Record a concise thinking step. Be brief: capture only the essential insight, calculation, or decision—like a minimal draft, not a verbose explanation. Returns progress and last 5 thought previews.
 
 ### Input
 
-| Field               | Type    | Required | Description                                      |
-| :------------------ | :------ | :------: | :----------------------------------------------- |
-| `thought`           | string  |   yes    | Current thinking step (1 to 50000 chars).        |
-| `thoughtNumber`     | number  |   yes    | Current thought number in sequence (1 to 10000). |
-| `totalThoughts`     | number  |   yes    | Estimated total thoughts needed (1 to 10000).    |
-| `nextThoughtNeeded` | boolean |   yes    | Whether another thought step is needed.          |
+| Field            | Type   | Required | Description                                                        |
+| :--------------- | :----- | :------: | :----------------------------------------------------------------- |
+| `thought`        | string |   yes    | Current thinking step (1–2000 chars).                              |
+| `totalThoughts`  | number |    no    | Estimated total thoughts (1–25, default: 3).                       |
+| `revisesThought` | number |    no    | Revise a previous thought by number. Original preserved for audit. |
 
 ### Output
 
-The tool returns JSON with a success or error shape:
-
-- Success: `{ ok: true, result: { ... } }`
-- Error: `{ ok: false, error: { code, message } }`
+The tool returns `structuredContent` with result fields directly.
 
 Result fields:
 
-| Field                  | Type    | Description                                          |
-| :--------------------- | :------ | :--------------------------------------------------- |
-| `thoughtNumber`        | number  | Stored thought number.                               |
-| `totalThoughts`        | number  | Effective total thoughts (at least `thoughtNumber`). |
-| `progress`             | number  | `thoughtNumber / totalThoughts` (0 to 1).            |
-| `nextThoughtNeeded`    | boolean | Mirrors input.                                       |
-| `thoughtHistoryLength` | number  | Stored thought count after pruning.                  |
-| `context`              | object  | Recent context summary (see below).                  |
+| Field                  | Type     | Description                                          |
+| :--------------------- | :------- | :--------------------------------------------------- |
+| `thoughtNumber`        | number   | Auto-incremented thought number.                     |
+| `totalThoughts`        | number   | Effective total thoughts (at least `thoughtNumber`). |
+| `progress`             | number   | `thoughtNumber / totalThoughts` (0 to 1).            |
+| `isComplete`           | boolean  | `true` when `thoughtNumber >= totalThoughts`.        |
+| `thoughtHistoryLength` | number   | Stored thought count after pruning.                  |
+| `hasRevisions`         | boolean  | `true` if any thought has been revised.              |
+| `activePathLength`     | number   | Count of non-superseded thoughts.                    |
+| `revisableThoughts`    | number[] | Thought numbers available for revision.              |
+| `context`              | object   | Recent context summary (see below).                  |
 
 Context fields:
 
-| Field            | Type  | Description                                            |
-| :--------------- | :---- | :----------------------------------------------------- |
-| `recentThoughts` | array | Up to the last 5 thoughts with `number` and `preview`. |
+| Field            | Type   | Description                                                            |
+| :--------------- | :----- | :--------------------------------------------------------------------- |
+| `recentThoughts` | array  | Up to the last 5 active thoughts with `number` and `preview`.          |
+| `revisionInfo`   | object | Present when revising: `revises` (number) and `supersedes` (number[]). |
 
 ### Example
+
+**Basic usage:**
 
 Input:
 
 ```json
 {
-  "thought": "Break down the problem into steps.",
-  "thoughtNumber": 1,
-  "totalThoughts": 3,
-  "nextThoughtNeeded": true
+  "thought": "3 steps: parse → validate → transform"
 }
 ```
 
@@ -171,20 +170,60 @@ Output (success):
 
 ```json
 {
-  "ok": true,
-  "result": {
-    "thoughtNumber": 1,
-    "totalThoughts": 3,
-    "progress": 0.3333333333333333,
-    "nextThoughtNeeded": true,
-    "thoughtHistoryLength": 1,
-    "context": {
-      "recentThoughts": [
-        {
-          "number": 1,
-          "preview": "Break down the problem into steps."
-        }
-      ]
+  "thoughtNumber": 1,
+  "totalThoughts": 3,
+  "progress": 0.3333333333333333,
+  "isComplete": false,
+  "thoughtHistoryLength": 1,
+  "hasRevisions": false,
+  "activePathLength": 1,
+  "revisableThoughts": [1],
+  "context": {
+    "recentThoughts": [
+      {
+        "number": 1,
+        "preview": "3 steps: parse → validate → transform"
+      }
+    ]
+  }
+}
+```
+
+**Revising a thought:**
+
+If you realize an earlier step was wrong, use `revisesThought` to correct it:
+
+Input:
+
+```json
+{
+  "thought": "Better approach: validate first, then parse",
+  "revisesThought": 1
+}
+```
+
+Output:
+
+```json
+{
+  "thoughtNumber": 2,
+  "totalThoughts": 3,
+  "progress": 0.6666666666666666,
+  "isComplete": false,
+  "thoughtHistoryLength": 2,
+  "hasRevisions": true,
+  "activePathLength": 1,
+  "revisableThoughts": [2],
+  "context": {
+    "recentThoughts": [
+      {
+        "number": 2,
+        "preview": "Better approach: validate first, then parse"
+      }
+    ],
+    "revisionInfo": {
+      "revises": 1,
+      "supersedes": [1]
     }
   }
 }
@@ -193,8 +232,7 @@ Output (success):
 ## Behavior and validation
 
 - Inputs are validated with Zod and unknown keys are rejected.
-- The first thought must have `thoughtNumber` 1.
-- Gaps in thought sequence are allowed but emit a diagnostics event.
+- `thoughtNumber` is auto-incremented (1, 2, 3...).
 - `totalThoughts` is adjusted up to at least `thoughtNumber`.
 - The engine stores thoughts in memory and prunes when limits are exceeded:
   - `maxThoughts` default: 500 (cap 10000)
@@ -207,7 +245,6 @@ This server publishes events via `node:diagnostics_channel`:
 
 - `thinkseq:tool` for `tool.start` and `tool.end` events
 - `thinkseq:lifecycle` for `lifecycle.started` and `lifecycle.shutdown`
-- `thinkseq:engine` for `engine.sequence_gap`
 
 ## Configuration
 

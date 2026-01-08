@@ -1,41 +1,32 @@
 import { z } from 'zod';
 
-const ContextSchema = z.strictObject({
-  recentThoughts: z
-    .array(
-      z.strictObject({
-        number: z.number(),
-        preview: z.string(),
-      })
-    )
-    .max(5),
-});
-
-const ResultSchema = z.strictObject({
+export const ThinkSeqOutputSchema = {
   thoughtNumber: z.number(),
   totalThoughts: z.number(),
   progress: z.number().min(0).max(1),
-  nextThoughtNeeded: z.boolean(),
+  isComplete: z.boolean().describe('True when thoughtNumber >= totalThoughts'),
   thoughtHistoryLength: z.number(),
-  context: ContextSchema,
-});
-
-const ErrorSchema = z.strictObject({
-  code: z.string(),
-  message: z.string(),
-});
-
-const SuccessSchema = z.strictObject({
-  ok: z.literal(true),
-  result: ResultSchema,
-});
-
-const FailureSchema = z.strictObject({
-  ok: z.literal(false),
-  error: ErrorSchema,
-});
-
-export const ThinkSeqOutputSchema = z.discriminatedUnion('ok', [
-  SuccessSchema,
-  FailureSchema,
-]);
+  hasRevisions: z.boolean().describe('True if any thought has been revised'),
+  activePathLength: z
+    .number()
+    .describe('Count of non-superseded thoughts in active chain'),
+  revisableThoughts: z
+    .array(z.number())
+    .describe('Thought numbers available for revision'),
+  context: z.object({
+    recentThoughts: z
+      .array(
+        z.object({
+          number: z.number(),
+          preview: z.string(),
+        })
+      )
+      .max(5),
+    revisionInfo: z
+      .object({
+        revises: z.number(),
+        supersedes: z.array(z.number()),
+      })
+      .optional(),
+  }),
+};

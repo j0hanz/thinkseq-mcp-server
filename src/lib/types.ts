@@ -1,12 +1,20 @@
 export interface ThoughtData {
   thought: string;
-  thoughtNumber: number;
   totalThoughts: number;
-  nextThoughtNeeded: boolean;
+  revisesThought?: number;
 }
 
 export interface StoredThought extends ThoughtData {
+  thoughtNumber: number;
   timestamp: number;
+  revisionOf?: number;
+  supersededBy?: number;
+  isActive: boolean;
+}
+
+export interface RevisionInfo {
+  revises: number;
+  supersedes: number[];
 }
 
 export interface ContextSummary {
@@ -14,6 +22,7 @@ export interface ContextSummary {
     number: number;
     preview: string;
   }[];
+  revisionInfo?: RevisionInfo;
 }
 
 export type ProcessResult =
@@ -23,8 +32,11 @@ export type ProcessResult =
         thoughtNumber: number;
         totalThoughts: number;
         progress: number;
-        nextThoughtNeeded: boolean;
+        isComplete: boolean;
         thoughtHistoryLength: number;
+        hasRevisions: boolean;
+        activePathLength: number;
+        revisableThoughts: number[];
         context: ContextSummary;
       };
       error?: never;

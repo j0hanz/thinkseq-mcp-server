@@ -1,20 +1,23 @@
 import { z } from 'zod';
 
-export const ThinkSeqInputSchema = z.strictObject({
-  thought: z.string().min(1).max(50000).describe('Your current thinking step'),
-  thoughtNumber: z
-    .number()
-    .int()
-    .min(1)
-    .max(10000)
-    .describe('Current thought number in sequence'),
+export const ThinkSeqInputSchema = {
+  thought: z.string().min(1).max(2000).describe('Your current thinking step'),
   totalThoughts: z
     .number()
     .int()
     .min(1)
-    .max(10000)
-    .describe('Estimated total thoughts needed (can adjust)'),
-  nextThoughtNeeded: z
-    .boolean()
-    .describe('Whether another thought step is needed'),
-});
+    .max(25)
+    .optional()
+    .default(3)
+    .describe('Estimated total thoughts (1-25, default: 3)'),
+  revisesThought: z
+    .number()
+    .int()
+    .min(1)
+    .optional()
+    .describe(
+      'Revise a previous thought by number. The original is preserved for audit.'
+    ),
+};
+
+export const ThinkSeqInputValidator = z.strictObject(ThinkSeqInputSchema);

@@ -43,9 +43,7 @@ class FakeServer implements ToolRegistrar {
 
 const createThoughtInput = (): ThoughtData => ({
   thought: 'Hello',
-  thoughtNumber: 1,
   totalThoughts: 2,
-  nextThoughtNeeded: true,
 });
 
 void describe('tools.registerThinkSeq metadata', () => {
@@ -73,10 +71,9 @@ void describe('tools.registerThinkSeq handler success', () => {
     const engine = {
       processThought: (input: ThoughtData): ProcessResult =>
         buildSuccessResult({
-          thoughtNumber: input.thoughtNumber,
+          thoughtNumber: 1,
           totalThoughts: input.totalThoughts,
-          progress: input.thoughtNumber / input.totalThoughts,
-          nextThoughtNeeded: input.nextThoughtNeeded,
+          progress: 1 / input.totalThoughts,
         }),
     };
 
@@ -86,7 +83,8 @@ void describe('tools.registerThinkSeq handler success', () => {
     const input = createThoughtInput();
     const response = await server.registered.handler(input);
 
-    assert.deepEqual(response.structuredContent.ok, true);
+    // structuredContent now contains result fields directly (no ok wrapper)
+    assert.deepEqual(response.structuredContent.thoughtNumber, 1);
     assert.equal(response.isError, undefined);
     assert.equal(
       response.content[0].text,
@@ -167,7 +165,7 @@ function buildSuccessResult(
       thoughtNumber: 1,
       totalThoughts: 1,
       progress: 1,
-      nextThoughtNeeded: false,
+      isComplete: true,
       thoughtHistoryLength: 1,
       context: { recentThoughts: [] },
       ...overrides,
