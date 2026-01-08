@@ -1,4 +1,12 @@
 import { collectRemovedBytes } from './engine/pruning.js';
+import { resolveRevisionTarget } from './engine/revision.js';
+import {
+  buildContextSummary,
+  collectSupersededChain,
+  findThoughtByNumber,
+  getActiveThoughts,
+  getRevisableThoughtNumbers,
+} from './engine/thoughtQueries.js';
 import {
   COMPACT_RATIO,
   COMPACT_THRESHOLD,
@@ -9,7 +17,6 @@ import {
   normalizeInt,
 } from './engineConfig.js';
 import type {
-  ContextSummary,
   ProcessResult,
   RevisionInfo,
   StoredThought,
@@ -56,102 +63,84 @@ export class ThinkingEngine {
   }
 
   #processNewThought(input: ThoughtData): ProcessResult {
-    const thoughtNumber = this.#totalLength() + 1;
-    const totalThoughts = Math.max(input.totalThoughts, thoughtNumber);
-    const stored: StoredThought = {
-      ...input,
-      thoughtNumber,
-      totalThoughts,
-      timestamp: Date.now(),
-      isActive: true,
-    };
+    const numbers = this.#nextThoughtNumbers(input.totalThoughts);
+    const stored = this.#buildStoredThought(input, numbers);
     this.#storeThought(stored);
     this.#pruneHistoryIfNeeded();
     return this.#buildProcessResult(stored);
   }
 
   #processRevision(input: ThoughtData): ProcessResult {
-    const targetNumber = input.revisesThought;
-    if (targetNumber === undefined) {
-      return {
-        ok: false,
-        error: {
-          code: 'E_REVISION_MISSING',
-          message: 'revisesThought is required for revision',
-        },
-      };
-    }
-    const target = this.#findThoughtByNumber(targetNumber);
+    const resolved = resolveRevisionTarget(
+      input,
+      this.#thoughts,
+      this.#headIndex
+    );
+    if (!resolved.ok) return resolved.error;
+    const { targetNumber } = resolved;
 
-    if (!target) {
-      return {
-        ok: false,
-        error: {
-          code: 'E_REVISION_TARGET_NOT_FOUND',
-          message: `Thought ${targetNumber} not found`,
-        },
-      };
-    }
+    const numbers = this.#nextThoughtNumbers(input.totalThoughts);
+    const supersedes = collectSupersededChain(
+      this.#thoughts,
+      this.#headIndex,
+      targetNumber
+    );
+    this.#applySupersedes(supersedes, numbers.thoughtNumber);
 
-    if (!target.isActive) {
-      return {
-        ok: false,
-        error: {
-          code: 'E_REVISION_TARGET_SUPERSEDED',
-          message: `Thought ${targetNumber} was already superseded`,
-        },
-      };
-    }
-
-    const thoughtNumber = this.#totalLength() + 1;
-    const totalThoughts = Math.max(input.totalThoughts, thoughtNumber);
-
-    const supersedes = this.#collectSupersededChain(targetNumber);
-
-    for (const num of supersedes) {
-      const thought = this.#findThoughtByNumber(num);
-      if (thought?.isActive) {
-        thought.isActive = false;
-        thought.supersededBy = thoughtNumber;
-      }
-    }
-
-    const stored: StoredThought = {
-      ...input,
-      thoughtNumber,
-      totalThoughts,
-      timestamp: Date.now(),
-      isActive: true,
+    const stored = this.#buildStoredThought(input, {
+      ...numbers,
       revisionOf: targetNumber,
-    };
+    });
 
     this.#storeThought(stored);
     this.#hasRevisions = true;
     this.#pruneHistoryIfNeeded();
 
-    const revisionInfo: RevisionInfo = { revises: targetNumber, supersedes };
-    return this.#buildProcessResult(stored, revisionInfo);
+    return this.#buildProcessResult(stored, {
+      revises: targetNumber,
+      supersedes,
+    });
   }
 
-  #findThoughtByNumber(num: number): StoredThought | undefined {
-    for (let i = this.#headIndex; i < this.#thoughts.length; i++) {
-      const thought = this.#thoughts[i];
-      if (thought?.thoughtNumber === num) {
-        return thought;
-      }
-    }
-    return undefined;
+  #nextThoughtNumbers(totalThoughts: number): {
+    thoughtNumber: number;
+    totalThoughts: number;
+  } {
+    const thoughtNumber = this.#totalLength() + 1;
+    return {
+      thoughtNumber,
+      totalThoughts: Math.max(totalThoughts, thoughtNumber),
+    };
   }
 
-  #collectSupersededChain(fromNumber: number): number[] {
-    const result: number[] = [];
-    for (let i = this.#headIndex; i < this.#thoughts.length; i++) {
-      const t = this.#thoughts[i];
-      if (t && t.thoughtNumber >= fromNumber && t.isActive) {
-        result.push(t.thoughtNumber);
+  #buildStoredThought(
+    input: ThoughtData,
+    details: {
+      thoughtNumber: number;
+      totalThoughts: number;
+      revisionOf?: number;
+    }
+  ): StoredThought {
+    return {
+      ...input,
+      thoughtNumber: details.thoughtNumber,
+      totalThoughts: details.totalThoughts,
+      timestamp: Date.now(),
+      isActive: true,
+      ...(details.revisionOf !== undefined && {
+        revisionOf: details.revisionOf,
+      }),
+    };
+  }
+
+  #applySupersedes(supersedes: number[], supersededBy: number): void {
+    for (const num of supersedes) {
+      const thought = findThoughtByNumber(this.#thoughts, this.#headIndex, num);
+      if (thought?.isActive) {
+        thought.isActive = false;
+        thought.supersededBy = supersededBy;
       }
     }
-    return result;
   }
 
   #storeThought(stored: StoredThought): void {
@@ -163,10 +152,10 @@ export class ThinkingEngine {
     stored: StoredThought,
     revisionInfo?: RevisionInfo
   ): ProcessResult {
-    const context = this.#buildContextSummary(revisionInfo);
+    const activeThoughts = getActiveThoughts(this.#thoughts, this.#headIndex);
+    const context = buildContextSummary(activeThoughts, revisionInfo);
     const isComplete = stored.thoughtNumber >= stored.totalThoughts;
-    const activePathLength = this.#activeLength();
-    const revisableThoughts = this.#getRevisableThoughts();
+    const revisableThoughts = getRevisableThoughtNumbers(activeThoughts);
 
     return {
       ok: true,
@@ -177,59 +166,15 @@ export class ThinkingEngine {
         isComplete,
         thoughtHistoryLength: this.#totalLength(),
         hasRevisions: this.#hasRevisions,
-        activePathLength,
+        activePathLength: activeThoughts.length,
         revisableThoughts,
         context,
       },
     };
   }
 
-  #buildContextSummary(revisionInfo?: RevisionInfo): ContextSummary {
-    const recent = this.#getRecentActiveThoughts();
-    const recentThoughts = recent.map((t) => ({
-      number: t.thoughtNumber,
-      preview: t.thought.slice(0, 100) + (t.thought.length > 100 ? '...' : ''),
-    }));
-
-    if (revisionInfo !== undefined) {
-      return { recentThoughts, revisionInfo };
-    }
-    return { recentThoughts };
-  }
-
   #totalLength(): number {
     return this.#thoughts.length - this.#headIndex;
-  }
-
-  #activeLength(): number {
-    let count = 0;
-    for (let i = this.#headIndex; i < this.#thoughts.length; i++) {
-      const thought = this.#thoughts[i];
-      if (thought?.isActive) count++;
-    }
-    return count;
-  }
-
-  #getRevisableThoughts(): number[] {
-    const result: number[] = [];
-    for (let i = this.#headIndex; i < this.#thoughts.length; i++) {
-      const t = this.#thoughts[i];
-      if (t?.isActive) {
-        result.push(t.thoughtNumber);
-      }
-    }
-    return result;
-  }
-
-  #getRecentActiveThoughts(): StoredThought[] {
-    const active: StoredThought[] = [];
-    for (let i = this.#headIndex; i < this.#thoughts.length; i++) {
-      const thought = this.#thoughts[i];
-      if (thought?.isActive) {
-        active.push(thought);
-      }
-    }
-    return active.slice(-5);
   }
 
   #compactIfNeeded(force = false): void {

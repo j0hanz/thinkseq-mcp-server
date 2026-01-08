@@ -2,44 +2,60 @@ import { performance } from 'node:perf_hooks';
 
 import { ThinkingEngine } from '../src/engine.js';
 
-const ITERATIONS = 10000;
-const THOUGHT_TEXT = 'x'.repeat(32);
-
-const engine = new ThinkingEngine({ maxThoughts: ITERATIONS + 1 });
-const durations = new Array<number>(ITERATIONS);
-
-const startMemory = process.memoryUsage().heapUsed;
-const totalStart = performance.now();
-
-for (let index = 0; index < ITERATIONS; index += 1) {
-  const start = performance.now();
-  engine.processThought({
-    thought: THOUGHT_TEXT,
-    thoughtNumber: index + 1,
-    totalThoughts: ITERATIONS,
-    nextThoughtNeeded: index + 1 < ITERATIONS,
-  });
-  durations[index] = performance.now() - start;
+interface BenchResult {
+  label: string;
+  iterations: number;
+  durationMs: number;
+  opsPerSecond: number;
 }
 
-const totalMs = performance.now() - totalStart;
-const endMemory = process.memoryUsage().heapUsed;
+function runNewThoughtBench(iterations: number): BenchResult {
+  const engine = new ThinkingEngine({ maxThoughts: iterations + 1 });
+  const start = performance.now();
+  for (let i = 0; i < iterations; i += 1) {
+    engine.processThought({
+      thought: `Thought ${i}`,
+      totalThoughts: iterations,
+    });
+  }
+  const durationMs = performance.now() - start;
+  return {
+    label: 'new-thought',
+    iterations,
+    durationMs,
+    opsPerSecond: iterations / (durationMs / 1000),
+  };
+}
 
-const sorted = durations.slice().sort((a, b) => a - b);
-const p95Index = Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95));
-const p95Ms = sorted[p95Index];
-const avgMs = totalMs / ITERATIONS;
-const maxMs = sorted[sorted.length - 1];
-const opsPerSec = (ITERATIONS / totalMs) * 1000;
+function runRevisionBench(iterations: number): BenchResult {
+  const start = performance.now();
+  for (let i = 0; i < iterations; i += 1) {
+    const engine = new ThinkingEngine();
+    engine.processThought({ thought: 'A', totalThoughts: 3 });
+    engine.processThought({ thought: 'B', totalThoughts: 3 });
+    engine.processThought({
+      thought: 'Revised A',
+      totalThoughts: 3,
+      revisesThought: 1,
+    });
+  }
+  const durationMs = performance.now() - start;
+  return {
+    label: 'revision',
+    iterations,
+    durationMs,
+    opsPerSecond: iterations / (durationMs / 1000),
+  };
+}
 
-const report = {
-  iterations: ITERATIONS,
-  totalMs: Number(totalMs.toFixed(2)),
-  avgMs: Number(avgMs.toFixed(4)),
-  p95Ms: Number(p95Ms.toFixed(4)),
-  maxMs: Number(maxMs.toFixed(4)),
-  opsPerSec: Number(opsPerSec.toFixed(2)),
-  heapUsedDeltaBytes: endMemory - startMemory,
-};
+function formatResult(result: BenchResult): string {
+  return `${result.label}: ${result.iterations} ops in ${result.durationMs.toFixed(
+    2
+  )}ms (${result.opsPerSecond.toFixed(0)} ops/sec)`;
+}
 
-console.log(JSON.stringify(report, null, 2));
+const results = [runNewThoughtBench(10000), runRevisionBench(1000)];
+
+for (const result of results) {
+  console.log(formatResult(result));
+}

@@ -166,6 +166,34 @@ void describe('ThinkingEngine.revision', () => {
     assert.deepStrictEqual(r3.result.context.revisionInfo.supersedes, [1, 2]);
   });
 
+  void it('should preserve revision output shape (characterization)', () => {
+    const engine = new ThinkingEngine();
+
+    engine.processThought({ thought: 'A', totalThoughts: 2 });
+    engine.processThought({ thought: 'B', totalThoughts: 2 });
+    const r3 = engine.processThought({
+      thought: 'A revised',
+      totalThoughts: 2,
+      revisesThought: 1,
+    });
+
+    assert.ok(r3.ok);
+    assert.deepStrictEqual(r3.result, {
+      thoughtNumber: 3,
+      totalThoughts: 3,
+      progress: 1,
+      isComplete: true,
+      thoughtHistoryLength: 3,
+      hasRevisions: true,
+      activePathLength: 1,
+      revisableThoughts: [3],
+      context: {
+        recentThoughts: [{ number: 3, preview: 'A revised' }],
+        revisionInfo: { revises: 1, supersedes: [1, 2] },
+      },
+    });
+  });
+
   void it('should track active path length after revision', () => {
     const engine = new ThinkingEngine();
 
