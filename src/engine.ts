@@ -29,14 +29,11 @@ function normalizeInt(
 export class ThinkingEngine {
   #thoughts: StoredThought[] = [];
   #branches = new Map<string, StoredThought[]>();
-  #branchIdsCache: string[] = [];
-  #branchIdsDirty = true;
   #estimatedBytes = 0;
   #revisionCount = 0;
   readonly #maxThoughts: number;
   readonly #maxMemoryBytes: number;
   readonly #estimatedThoughtOverheadBytes: number;
-
   constructor(options: ThinkingEngineOptions = {}) {
     this.#maxThoughts = normalizeInt(
       options.maxThoughts,
@@ -58,29 +55,20 @@ export class ThinkingEngine {
   processThought(input: ThoughtData): ProcessResult {
     this.#validateThoughtNumber(input);
     this.#validateReferences(input);
-    const stored = this.#createStoredThought(input);
-    this.#storeThought(stored);
-    this.#pruneHistoryIfNeeded();
-    return this.#buildProcessResult(stored);
-  }
-
-  #createStoredThought(input: ThoughtData): StoredThought {
     const totalThoughts = Math.max(input.totalThoughts, input.thoughtNumber);
-    return {
+    const stored: StoredThought = {
       ...input,
       totalThoughts,
       timestamp: Date.now(),
     };
+    this.#storeThought(stored);
+    this.#pruneHistoryIfNeeded();
+    return this.#buildProcessResult(stored);
   }
-
   #storeThought(stored: StoredThought): void {
     this.#thoughts.push(stored);
     this.#estimatedBytes += this.#estimateThoughtBytes(stored);
     if (stored.isRevision) this.#revisionCount += 1;
-    this.#storeBranchThought(stored);
-  }
-
-  #storeBranchThought(stored: StoredThought): void {
     if (!stored.branchId) return;
     const branch = this.#branches.get(stored.branchId);
     if (branch) {
@@ -88,9 +76,7 @@ export class ThinkingEngine {
       return;
     }
     this.#branches.set(stored.branchId, [stored]);
-    this.#branchIdsDirty = true;
   }
-
   #buildProcessResult(stored: StoredThought): ProcessResult {
     const context = this.#buildContextSummary();
     return {
@@ -101,20 +87,11 @@ export class ThinkingEngine {
         progress: Math.min(1, stored.thoughtNumber / stored.totalThoughts),
         nextThoughtNeeded: stored.nextThoughtNeeded,
         thoughtHistoryLength: this.#thoughts.length,
-        branches: this.#getBranchIds(),
+        branches: Array.from(this.#branches.keys()),
         context,
       },
     };
   }
-
-  #getBranchIds(): string[] {
-    if (this.#branchIdsDirty) {
-      this.#branchIdsCache = Array.from(this.#branches.keys());
-      this.#branchIdsDirty = false;
-    }
-    return this.#branchIdsCache;
-  }
-
   #buildContextSummary(): ContextSummary {
     const recent = this.#thoughts.slice(-5);
     const currentBranch = this.#thoughts.at(-1)?.branchId;
@@ -131,63 +108,47 @@ export class ThinkingEngine {
       hasRevisions: this.#revisionCount > 0,
     };
   }
-
   #validateThoughtNumber(input: ThoughtData): void {
     const lastThought = this.#thoughts.at(-1);
     if (!lastThought) {
-      this.#ensureFirstThought(input.thoughtNumber);
+      if (input.thoughtNumber !== 1) {
+        throw new Error(
+          `First thought must be number 1, got ${String(input.thoughtNumber)}`
+        );
+      }
       return;
     }
-    if (this.#isRevisionOrBranch(input)) return;
-    this.#warnOnSequenceGap(lastThought, input.thoughtNumber);
+    if (input.isRevision === true || input.branchFromThought !== undefined) {
+      return;
+    }
+    if (input.thoughtNumber !== lastThought.thoughtNumber + 1) {
+      publishEngineEvent({
+        type: 'engine.sequence_gap',
+        ts: Date.now(),
+        expected: lastThought.thoughtNumber + 1,
+        received: input.thoughtNumber,
+      });
+    }
   }
-
-  #ensureFirstThought(thoughtNumber: number): void {
-    if (thoughtNumber === 1) return;
-    throw new Error(
-      `First thought must be number 1, got ${String(thoughtNumber)}`
-    );
-  }
-
-  #isRevisionOrBranch(input: ThoughtData): boolean {
-    return input.isRevision === true || input.branchFromThought !== undefined;
-  }
-
-  #warnOnSequenceGap(lastThought: StoredThought, thoughtNumber: number): void {
-    if (thoughtNumber === lastThought.thoughtNumber + 1) return;
-    publishEngineEvent({
-      type: 'engine.sequence_gap',
-      ts: Date.now(),
-      expected: lastThought.thoughtNumber + 1,
-      received: thoughtNumber,
-    });
-  }
-
   #validateReferences(input: ThoughtData): void {
     const maxThoughtNumber = this.#thoughts.at(-1)?.thoughtNumber ?? 0;
-    this.#assertValidReference(
-      'revisesThought',
-      input.revisesThought,
-      maxThoughtNumber
-    );
-    this.#assertValidReference(
-      'branchFromThought',
-      input.branchFromThought,
-      maxThoughtNumber
-    );
+    if (
+      input.revisesThought !== undefined &&
+      input.revisesThought > maxThoughtNumber
+    ) {
+      throw new Error(
+        `revisesThought ${String(input.revisesThought)} references non-existent thought (max: ${String(maxThoughtNumber)})`
+      );
+    }
+    if (
+      input.branchFromThought !== undefined &&
+      input.branchFromThought > maxThoughtNumber
+    ) {
+      throw new Error(
+        `branchFromThought ${String(input.branchFromThought)} references non-existent thought (max: ${String(maxThoughtNumber)})`
+      );
+    }
   }
-
-  #assertValidReference(
-    field: string,
-    value: number | undefined,
-    max: number
-  ): void {
-    if (value === undefined || value <= max) return;
-    throw new Error(
-      `${field} ${String(value)} references non-existent thought (max: ${String(max)})`
-    );
-  }
-
   #pruneHistoryIfNeeded(): void {
     const excess = this.#thoughts.length - this.#maxThoughts;
     if (excess > 0) {
@@ -203,27 +164,14 @@ export class ThinkingEngine {
       this.#removeOldest(toRemove);
     }
   }
-
   #estimateThoughtBytes(thought: StoredThought): number {
     return thought.thought.length * 2 + this.#estimatedThoughtOverheadBytes;
   }
-
   #removeOldest(count: number): void {
     if (count <= 0 || this.#thoughts.length === 0) return;
     const actual = Math.min(count, this.#thoughts.length);
     const removed = this.#thoughts.splice(0, actual);
     if (removed.length === 0) return;
-    this.#applyRemoval(removed);
-  }
-
-  #applyRemoval(removed: StoredThought[]): void {
-    const branchRemovals = this.#collectBranchRemovals(removed);
-    for (const [branchId, removeCount] of branchRemovals) {
-      this.#trimBranch(branchId, removeCount);
-    }
-  }
-
-  #collectBranchRemovals(removed: StoredThought[]): Map<string, number> {
     const branchRemovals = new Map<string, number>();
     for (const thought of removed) {
       this.#estimatedBytes -= this.#estimateThoughtBytes(thought);
@@ -234,15 +182,15 @@ export class ThinkingEngine {
         (branchRemovals.get(thought.branchId) ?? 0) + 1
       );
     }
-    return branchRemovals;
+    for (const [branchId, removeCount] of branchRemovals) {
+      this.#trimBranch(branchId, removeCount);
+    }
   }
-
   #trimBranch(branchId: string, removeCount: number): void {
     const branch = this.#branches.get(branchId);
     if (!branch) return;
     if (removeCount >= branch.length) {
       this.#branches.delete(branchId);
-      this.#branchIdsDirty = true;
       return;
     }
     branch.splice(0, removeCount);

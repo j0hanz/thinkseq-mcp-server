@@ -8,14 +8,18 @@ type RequestHandler = (request: unknown, extra: unknown) => unknown;
 
 const INIT_FIRST_ERROR_MESSAGE = 'initialize must be the first request';
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
 function isRequestHandler(value: unknown): value is RequestHandler {
   return typeof value === 'function';
 }
 
 function getInitializeProtocolVersion(request: unknown): unknown {
-  if (!request || typeof request !== 'object') return undefined;
+  if (!isRecord(request)) return undefined;
   const params: unknown = Reflect.get(request, 'params');
-  if (!params || typeof params !== 'object') return undefined;
+  if (!isRecord(params)) return undefined;
   return Reflect.get(params, 'protocolVersion');
 }
 
@@ -49,30 +53,31 @@ function wrapWithInitializationGuard(
   };
 }
 
-function getProtocolObject(server: unknown): object | undefined {
-  if (!server || typeof server !== 'object') return undefined;
+function getProtocolObject(
+  server: unknown
+): Record<string, unknown> | undefined {
+  if (!isRecord(server)) return undefined;
   const protocol: unknown = Reflect.get(server, 'server');
-  return protocol && typeof protocol === 'object' ? protocol : undefined;
+  return isRecord(protocol) ? protocol : undefined;
 }
 
 function getRequestHandlers(
-  protocol: object
+  protocol: Record<string, unknown>
 ): Map<unknown, unknown> | undefined {
   const handlers: unknown = Reflect.get(protocol, '_requestHandlers');
   return handlers instanceof Map ? handlers : undefined;
 }
 
 function installFallbackRequestHandler(
-  protocol: object,
+  protocol: Record<string, unknown>,
   state: { sawInitialize: boolean }
 ): void {
   // Guard unknown methods as well (so pre-init calls to unknown methods don't
   // fall through to MethodNotFound).
   const handler = (request: unknown): never => {
-    const method: unknown =
-      request && typeof request === 'object'
-        ? Reflect.get(request, 'method')
-        : undefined;
+    const method: unknown = isRecord(request)
+      ? Reflect.get(request, 'method')
+      : undefined;
     if (!state.sawInitialize && method !== 'initialize') {
       throw new McpError(ErrorCode.InvalidRequest, INIT_FIRST_ERROR_MESSAGE);
     }

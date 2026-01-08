@@ -3,8 +3,6 @@ import diagnostics_channel from 'node:diagnostics_channel';
 import { describe, it } from 'node:test';
 import type { TestContext } from 'node:test';
 
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-
 import type { ThinkingEngine } from '../src/engine.js';
 import type { ErrorResponse } from '../src/lib/errors.js';
 import type { ThoughtData } from '../src/lib/types.js';
@@ -14,6 +12,7 @@ import { ThinkSeqOutputSchema } from '../src/schemas/outputs.js';
 import { registerThinkSeq } from '../src/tools/thinkseq.js';
 
 type StructuredResponse = ProcessResult | ErrorResponse['structuredContent'];
+type ToolRegistrar = Parameters<typeof registerThinkSeq>[0];
 
 interface RegisteredTool {
   name: string;
@@ -31,16 +30,16 @@ interface RegisteredTool {
       }>;
 }
 
-class FakeServer {
+class FakeServer implements ToolRegistrar {
   public registered: RegisteredTool | null = null;
 
-  registerTool(
+  registerTool: ToolRegistrar['registerTool'] = (
     name: string,
     definition: unknown,
     handler: RegisteredTool['handler']
-  ): void {
+  ) => {
     this.registered = { name, definition, handler };
-  }
+  };
 }
 
 const createThoughtInput = (): ThoughtData => ({
@@ -68,7 +67,7 @@ void describe('tools.registerThinkSeq metadata', () => {
       }),
     } satisfies Pick<ThinkingEngine, 'processThought'>;
 
-    registerThinkSeq(server as unknown as McpServer, engine);
+    registerThinkSeq(server, engine);
 
     assert.ok(server.registered);
     assert.equal(server.registered.name, 'thinkseq');
@@ -98,7 +97,7 @@ void describe('tools.registerThinkSeq handler success', () => {
       }),
     };
 
-    registerThinkSeq(server as unknown as McpServer, engine);
+    registerThinkSeq(server, engine);
     assert.ok(server.registered);
 
     const input = createThoughtInput();
@@ -135,7 +134,7 @@ void describe('tools.registerThinkSeq optional fields', () => {
       },
     };
 
-    registerThinkSeq(server as unknown as McpServer, engine);
+    registerThinkSeq(server, engine);
     assert.ok(server.registered);
 
     const response = await server.registered.handler({
@@ -188,7 +187,7 @@ void describe('tools.registerThinkSeq handler error', () => {
       },
     };
 
-    registerThinkSeq(server as unknown as McpServer, engine);
+    registerThinkSeq(server, engine);
     assert.ok(server.registered);
 
     const input = createThoughtInput();
@@ -257,7 +256,7 @@ function registerThinkSeqForTests(
   engine: Pick<ThinkingEngine, 'processThought'>
 ): RegisteredTool['handler'] {
   const server = new FakeServer();
-  registerThinkSeq(server as unknown as McpServer, engine);
+  registerThinkSeq(server, engine);
   assert.ok(server.registered);
   return server.registered.handler;
 }
