@@ -40,6 +40,7 @@ interface ShutdownDependencies {
 interface RunDependencies {
   processLike?: ProcessLike;
   packageReadTimeoutMs?: number;
+  shutdownTimeoutMs?: number;
   readPackageJson?: (signal?: AbortSignal) => Promise<PackageInfo>;
   publishLifecycleEvent?: (event: LifecycleEvent) => void;
   createServer?: (name: string, version: string) => ServerLike;
@@ -170,6 +171,7 @@ export async function run(deps: RunDependencies = {}): Promise<void> {
     installShutdownHandlers:
       deps.installShutdownHandlers ?? installShutdownHandlers,
     now: deps.now ?? Date.now,
+    shutdownTimeoutMs: deps.shutdownTimeoutMs,
   };
 
   const pkg = await resolved.readPackageJson(
@@ -196,5 +198,8 @@ export async function run(deps: RunDependencies = {}): Promise<void> {
     transport,
     publishLifecycleEvent: resolved.publishLifecycleEvent,
     now: resolved.now,
+    ...(resolved.shutdownTimeoutMs !== undefined && {
+      shutdownTimeoutMs: resolved.shutdownTimeoutMs,
+    }),
   });
 }

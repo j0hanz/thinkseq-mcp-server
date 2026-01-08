@@ -1,6 +1,13 @@
 import diagnosticsChannel from 'node:diagnostics_channel';
 
-export type ToolEvent =
+import { getRequestContext } from './context.js';
+
+export interface EventContext {
+  requestId: string;
+  startedAt: number;
+}
+
+type ToolEventBase =
   | {
       type: 'tool.start';
       tool: 'thinkseq';
@@ -23,16 +30,20 @@ export type ToolEvent =
       durationMs?: number;
     };
 
+export type ToolEvent = ToolEventBase & { context?: EventContext };
+
 export type LifecycleEvent =
   | { type: 'lifecycle.started'; ts: number }
   | { type: 'lifecycle.shutdown'; ts: number; signal: string };
 
-export interface EngineEvent {
+interface EngineEventBase {
   type: 'engine.sequence_gap';
   ts: number;
   expected: number;
   received: number;
 }
+
+export type EngineEvent = EngineEventBase & { context?: EventContext };
 
 const toolChannel = diagnosticsChannel.channel('thinkseq:tool');
 const lifecycleChannel = diagnosticsChannel.channel('thinkseq:lifecycle');
@@ -50,8 +61,21 @@ function safePublish(
   }
 }
 
+function attachContext<T extends { context?: EventContext }>(event: T): T {
+  const context = getRequestContext();
+  if (!context) return event;
+  return {
+    ...event,
+    context: {
+      ...event.context,
+      requestId: context.requestId,
+      startedAt: context.startedAt,
+    },
+  };
+}
+
 export function publishToolEvent(event: ToolEvent): void {
-  safePublish(toolChannel, event);
+  safePublish(toolChannel, attachContext(event));
 }
 
 export function publishLifecycleEvent(event: LifecycleEvent): void {
@@ -59,5 +83,5 @@ export function publishLifecycleEvent(event: LifecycleEvent): void {
 }
 
 export function publishEngineEvent(event: EngineEvent): void {
-  safePublish(engineChannel, event);
+  safePublish(engineChannel, attachContext(event));
 }

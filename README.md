@@ -22,6 +22,20 @@ ThinkSeq provides a single MCP tool, `thinkseq`, for structured, sequential thin
 npx -y @j0hanz/thinkseq-mcp@latest
 ```
 
+## CLI options
+
+```bash
+thinkseq --max-thoughts 500 --max-memory-mb 100
+```
+
+Available flags:
+
+- `--max-thoughts <number>`: Max thoughts to keep in memory.
+- `--max-memory-mb <number>`: Max memory (MB) for stored thoughts.
+- `--shutdown-timeout-ms <number>`: Graceful shutdown timeout.
+- `--package-read-timeout-ms <number>`: Package.json read timeout.
+- `-h, --help`: Show help.
+
 ## MCP client configuration
 
 Add this to your MCP client settings:

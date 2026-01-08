@@ -5,6 +5,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { z } from 'zod';
 
 import type { ThinkingEngine } from '../engine.js';
+import { runWithContext } from '../lib/context.js';
 import { publishToolEvent } from '../lib/diagnostics.js';
 import type { ErrorResponse } from '../lib/errors.js';
 import { createErrorResponse, getErrorMessage } from '../lib/errors.js';
@@ -124,20 +125,22 @@ async function handleThinkSeq(
   engine: EngineLike,
   input: ThinkSeqInput
 ): Promise<ToolResponse> {
-  const normalized = normalizeThoughtInput(input);
-  publishToolStart();
-  const start = performance.now();
-  try {
-    const result = await engine.processThought(normalized);
-    const durationMs = getDurationMs(start);
-    publishToolSuccess(durationMs);
-    return buildSuccessResponse(result);
-  } catch (err) {
-    const errorMessage = getErrorMessage(err);
-    const durationMs = getDurationMs(start);
-    publishToolFailure(errorMessage, durationMs);
-    return createErrorResponse('E_THINK', errorMessage);
-  }
+  return runWithContext(async () => {
+    const normalized = normalizeThoughtInput(input);
+    publishToolStart();
+    const start = performance.now();
+    try {
+      const result = await engine.processThought(normalized);
+      const durationMs = getDurationMs(start);
+      publishToolSuccess(durationMs);
+      return buildSuccessResponse(result);
+    } catch (err) {
+      const errorMessage = getErrorMessage(err);
+      const durationMs = getDurationMs(start);
+      publishToolFailure(errorMessage, durationMs);
+      return createErrorResponse('E_THINK', errorMessage);
+    }
+  });
 }
 
 export function registerThinkSeq(

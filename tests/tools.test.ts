@@ -167,6 +167,17 @@ void describe('tools.registerThinkSeq diagnostics durationMs (success)', () => {
   });
 });
 
+void describe('tools.registerThinkSeq diagnostics context', () => {
+  void it('publishes request context on start/end', async (t) => {
+    const { messages } = captureDiagnostics(t, 'thinkseq:tool');
+
+    const handler = registerThinkSeqForTests(createOkEngine());
+    await handler(createThoughtInput());
+
+    assertToolMessagesHaveContext(messages);
+  });
+});
+
 void describe('tools.registerThinkSeq diagnostics durationMs (error)', () => {
   void it('publishes durationMs on error', async (t) => {
     const { messages } = captureDiagnostics(t, 'thinkseq:tool');
@@ -282,4 +293,28 @@ function assertToolMessagesHaveDuration(
   assert.ok(typeof end.durationMs === 'number');
   assert.ok(Number.isFinite(end.durationMs));
   assert.ok(end.durationMs >= 0);
+}
+
+function assertToolMessagesHaveContext(messages: unknown[]): void {
+  assert.equal(messages.length, 2);
+  const start = getMessageRecord(messages[0]);
+  const end = getMessageRecord(messages[1]);
+  const startContext = getContextRecord(start);
+  const endContext = getContextRecord(end);
+
+  assert.equal(start.type, 'tool.start');
+  assert.equal(end.type, 'tool.end');
+
+  assert.equal(startContext.requestId, endContext.requestId);
+  assert.equal(startContext.startedAt, endContext.startedAt);
+}
+
+function getContextRecord(message: Record<string, unknown>): Record<string, unknown> {
+  const context = message.context;
+  assert.ok(isRecord(context));
+  assert.equal(typeof context.requestId, 'string');
+  assert.ok(context.requestId.length > 0);
+  assert.equal(typeof context.startedAt, 'number');
+  assert.ok(Number.isFinite(context.startedAt));
+  return context;
 }
