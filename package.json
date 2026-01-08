@@ -2,7 +2,7 @@
   "name": "@j0hanz/thinkseq-mcp",
   "version": "1.0.5",
   "mcpName": "io.github.j0hanz/thinkseq",
-  "description": "An MCP implementation for advanced reasoning and thinking sequences.",
+  "description": "An thinking and reasoning engine for the Model Context Protocol (MCP).",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

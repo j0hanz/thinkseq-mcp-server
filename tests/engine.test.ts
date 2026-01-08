@@ -101,54 +101,6 @@ void describe('ThinkingEngine.sequence', () => {
   });
 });
 
-void describe('ThinkingEngine.references.revisesThought', () => {
-  void it('should reject revisesThought referencing non-existent thought', () => {
-    const engine = createSeededEngine();
-
-    assert.throws(() => {
-      engine.processThought({
-        thought: 'Invalid revision',
-        thoughtNumber: 2,
-        totalThoughts: 3,
-        nextThoughtNeeded: true,
-        isRevision: true,
-        revisesThought: 99,
-      });
-    }, /revisesThought 99 references non-existent thought/);
-  });
-
-  void it('should allow valid revisesThought reference', () => {
-    const engine = createSeededEngine();
-
-    const result = engine.processThought({
-      thought: 'Valid revision of thought 1',
-      thoughtNumber: 2,
-      totalThoughts: 3,
-      nextThoughtNeeded: true,
-      isRevision: true,
-      revisesThought: 1,
-    });
-    assert.ok(result.ok);
-  });
-});
-
-void describe('ThinkingEngine.references.branchFromThought', () => {
-  void it('should reject branchFromThought referencing non-existent thought', () => {
-    const engine = createSeededEngine();
-
-    assert.throws(() => {
-      engine.processThought({
-        thought: 'Invalid branch',
-        thoughtNumber: 2,
-        totalThoughts: 3,
-        nextThoughtNeeded: true,
-        branchFromThought: 50,
-        branchId: 'invalid-branch',
-      });
-    }, /branchFromThought 50 references non-existent thought/);
-  });
-});
-
 void describe('ThinkingEngine.sequence diagnostics', () => {
   void it('should emit diagnostics event on sequence gap', async (t) => {
     const { messages } = captureDiagnostics(t, 'thinkseq:engine');
@@ -175,39 +127,6 @@ void describe('ThinkingEngine.sequence diagnostics', () => {
   });
 });
 
-void describe('ThinkingEngine.context', () => {
-  void it('should track branches and revisions in context', () => {
-    const engine = new ThinkingEngine();
-
-    engine.processThought({
-      thought: 'First',
-      thoughtNumber: 1,
-      totalThoughts: 2,
-      nextThoughtNeeded: true,
-      branchId: 'branch-a',
-      thoughtType: 'analysis',
-    });
-
-    const result = engine.processThought({
-      thought: 'Revision',
-      thoughtNumber: 2,
-      totalThoughts: 2,
-      nextThoughtNeeded: false,
-      isRevision: true,
-      revisesThought: 1,
-      branchFromThought: 1,
-      branchId: 'branch-a',
-      thoughtType: 'revision',
-    });
-
-    assert.ok(result.ok);
-    assert.ok(result.result.branches.includes('branch-a'));
-    assert.equal(result.result.context.currentBranch, 'branch-a');
-    assert.equal(result.result.context.hasRevisions, true);
-    assert.equal(result.result.context.recentThoughts[0].type, 'analysis');
-  });
-});
-
 void describe('ThinkingEngine.pruning', () => {
   void it('should prune old thoughts when count exceeds max', () => {
     const engine = new ThinkingEngine({ maxThoughts: 5 }); // Small limit for testing
@@ -228,75 +147,8 @@ void describe('ThinkingEngine.pruning', () => {
 
     assert.ok(result.result);
     assert.ok(result.result.thoughtHistoryLength < 12);
-    assert.ok(result.result.branches.includes('branch-a'));
-  });
-
-  void it('removes empty branches when all thoughts pruned', () => {
-    const engine = new ThinkingEngine({ maxThoughts: 2 });
-    engine.processThought({
-      thought: 'Branch seed',
-      thoughtNumber: 1,
-      totalThoughts: 3,
-      nextThoughtNeeded: true,
-      branchId: 'branch-a',
-    });
-    engine.processThought({
-      thought: 'Second',
-      thoughtNumber: 2,
-      totalThoughts: 3,
-      nextThoughtNeeded: true,
-    });
-
-    const result = engine.processThought({
-      thought: 'Third',
-      thoughtNumber: 3,
-      totalThoughts: 3,
-      nextThoughtNeeded: false,
-    });
-
-    assert.ok(result.ok);
-    assert.equal(result.result.branches.includes('branch-a'), false);
-  });
-
-  void it('clears revision flag after pruning last revision', () => {
-    const engine = new ThinkingEngine({ maxThoughts: 1 });
-    engine.processThought({
-      thought: 'Initial',
-      thoughtNumber: 1,
-      totalThoughts: 3,
-      nextThoughtNeeded: true,
-    });
-    engine.processThought({
-      thought: 'Revision',
-      thoughtNumber: 2,
-      totalThoughts: 3,
-      nextThoughtNeeded: true,
-      isRevision: true,
-      revisesThought: 1,
-    });
-
-    const result = engine.processThought({
-      thought: 'Third',
-      thoughtNumber: 3,
-      totalThoughts: 3,
-      nextThoughtNeeded: false,
-    });
-
-    assert.ok(result.ok);
-    assert.equal(result.result.context.hasRevisions, false);
   });
 });
-
-function createSeededEngine(): ThinkingEngine {
-  const engine = new ThinkingEngine();
-  engine.processThought({
-    thought: 'First',
-    thoughtNumber: 1,
-    totalThoughts: 3,
-    nextThoughtNeeded: true,
-  });
-  return engine;
-}
 
 function buildNumberedThoughts(
   count: number,
@@ -343,7 +195,6 @@ function buildMemoryPruneInputs(): ThoughtData[] {
     thoughtNumber: 12,
     totalThoughts: 12,
     nextThoughtNeeded: false,
-    branchId: 'branch-a',
   };
   return [...baseThoughts, lastThought];
 }

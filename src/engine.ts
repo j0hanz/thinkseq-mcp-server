@@ -1,4 +1,4 @@
-import { collectRemovalStats } from './engine/pruning.js';
+import { collectRemovedBytes } from './engine/pruning.js';
 import {
   COMPACT_RATIO,
   COMPACT_THRESHOLD,
@@ -22,17 +22,10 @@ export interface ThinkingEngineOptions {
   estimatedThoughtOverheadBytes?: number;
 }
 
-interface BranchState {
-  thoughts: StoredThought[];
-  headIndex: number;
-}
-
 export class ThinkingEngine {
   #thoughts: StoredThought[] = [];
   #headIndex = 0;
-  #branches = new Map<string, BranchState>();
   #estimatedBytes = 0;
-  #revisionCount = 0;
   readonly #maxThoughts: number;
   readonly #maxMemoryBytes: number;
   readonly #estimatedThoughtOverheadBytes: number;
@@ -56,7 +49,6 @@ export class ThinkingEngine {
 
   processThought(input: ThoughtData): ProcessResult {
     this.#validateThoughtNumber(input);
-    this.#validateReferences(input);
     const totalThoughts = Math.max(input.totalThoughts, input.thoughtNumber);
     const stored: StoredThought = {
       ...input,
@@ -70,17 +62,6 @@ export class ThinkingEngine {
   #storeThought(stored: StoredThought): void {
     this.#thoughts.push(stored);
     this.#estimatedBytes += this.#estimateThoughtBytes(stored);
-    if (stored.isRevision) this.#revisionCount += 1;
-    if (!stored.branchId) return;
-    const state = this.#branches.get(stored.branchId);
-    if (state) {
-      state.thoughts.push(stored);
-      return;
-    }
-    this.#branches.set(stored.branchId, {
-      thoughts: [stored],
-      headIndex: 0,
-    });
   }
   #buildProcessResult(stored: StoredThought): ProcessResult {
     const context = this.#buildContextSummary();
@@ -92,25 +73,18 @@ export class ThinkingEngine {
         progress: Math.min(1, stored.thoughtNumber / stored.totalThoughts),
         nextThoughtNeeded: stored.nextThoughtNeeded,
         thoughtHistoryLength: this.#activeLength(),
-        branches: Array.from(this.#branches.keys()),
         context,
       },
     };
   }
   #buildContextSummary(): ContextSummary {
     const recent = this.#getRecentThoughts();
-    const currentBranch = this.#getLastThought()?.branchId;
     return {
-      recentThoughts: recent.map((t) => {
-        const base = {
-          number: t.thoughtNumber,
-          preview:
-            t.thought.slice(0, 100) + (t.thought.length > 100 ? '...' : ''),
-        };
-        return t.thoughtType ? { ...base, type: t.thoughtType } : base;
-      }),
-      ...(currentBranch !== undefined ? { currentBranch } : {}),
-      hasRevisions: this.#revisionCount > 0,
+      recentThoughts: recent.map((t) => ({
+        number: t.thoughtNumber,
+        preview:
+          t.thought.slice(0, 100) + (t.thought.length > 100 ? '...' : ''),
+      })),
     };
   }
   #activeLength(): number {
@@ -153,9 +127,6 @@ export class ThinkingEngine {
       }
       return;
     }
-    if (input.isRevision === true || input.branchFromThought !== undefined) {
-      return;
-    }
     if (input.thoughtNumber !== lastThought.thoughtNumber + 1) {
       publishEngineEvent({
         type: 'engine.sequence_gap',
@@ -163,25 +134,6 @@ export class ThinkingEngine {
         expected: lastThought.thoughtNumber + 1,
         received: input.thoughtNumber,
       });
-    }
-  }
-  #validateReferences(input: ThoughtData): void {
-    const maxThoughtNumber = this.#getLastThought()?.thoughtNumber ?? 0;
-    if (
-      input.revisesThought !== undefined &&
-      input.revisesThought > maxThoughtNumber
-    ) {
-      throw new Error(
-        `revisesThought ${String(input.revisesThought)} references non-existent thought (max: ${String(maxThoughtNumber)})`
-      );
-    }
-    if (
-      input.branchFromThought !== undefined &&
-      input.branchFromThought > maxThoughtNumber
-    ) {
-      throw new Error(
-        `branchFromThought ${String(input.branchFromThought)} references non-existent thought (max: ${String(maxThoughtNumber)})`
-      );
     }
   }
   #pruneHistoryIfNeeded(): void {
@@ -209,12 +161,13 @@ export class ThinkingEngine {
     const start = this.#headIndex;
     const end = start + actual;
     const forceCompact = options.forceCompact ?? false;
-    const { branchRemovals, removedBytes, removedRevisions } =
-      collectRemovalStats(this.#thoughts, start, end, (thought) =>
-        this.#estimateThoughtBytes(thought)
-      );
+    const removedBytes = collectRemovedBytes(
+      this.#thoughts,
+      start,
+      end,
+      (thought) => this.#estimateThoughtBytes(thought)
+    );
     this.#estimatedBytes -= removedBytes;
-    this.#revisionCount -= removedRevisions;
     this.#headIndex = end;
     if (this.#activeLength() === 0) {
       this.#thoughts = [];
@@ -222,31 +175,5 @@ export class ThinkingEngine {
     } else {
       this.#compactIfNeeded(forceCompact);
     }
-    for (const [branchId, removeCount] of branchRemovals) {
-      this.#trimBranch(branchId, removeCount, forceCompact);
-    }
-  }
-  #trimBranch(
-    branchId: string,
-    removeCount: number,
-    forceCompact: boolean
-  ): void {
-    const branch = this.#branches.get(branchId);
-    if (!branch) return;
-    const activeLength = branch.thoughts.length - branch.headIndex;
-    if (removeCount >= activeLength) {
-      this.#branches.delete(branchId);
-      return;
-    }
-    branch.headIndex += removeCount;
-    if (
-      !forceCompact &&
-      branch.headIndex < COMPACT_THRESHOLD &&
-      branch.headIndex < branch.thoughts.length * COMPACT_RATIO
-    ) {
-      return;
-    }
-    branch.thoughts = branch.thoughts.slice(branch.headIndex);
-    branch.headIndex = 0;
   }
 }

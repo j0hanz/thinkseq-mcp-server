@@ -1,25 +1,14 @@
 import { z } from 'zod';
 
-const ThoughtTypeSchema = z.enum([
-  'analysis',
-  'hypothesis',
-  'verification',
-  'revision',
-  'conclusion',
-]);
-
 const ContextSchema = z.strictObject({
   recentThoughts: z
     .array(
       z.strictObject({
         number: z.number(),
         preview: z.string(),
-        type: ThoughtTypeSchema.optional(),
       })
     )
     .max(5),
-  currentBranch: z.string().optional(),
-  hasRevisions: z.boolean(),
 });
 
 const ResultSchema = z.strictObject({
@@ -28,7 +17,6 @@ const ResultSchema = z.strictObject({
   progress: z.number().min(0).max(1),
   nextThoughtNeeded: z.boolean(),
   thoughtHistoryLength: z.number(),
-  branches: z.array(z.string()),
   context: ContextSchema,
 });
 

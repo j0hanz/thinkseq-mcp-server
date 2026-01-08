@@ -2,7 +2,7 @@
 
 <img src="docs/logo.png" alt="ThinkSeq MCP Server Logo" width="175" />
 
-An MCP implementation for advanced reasoning and thinking sequences.
+A minimal MCP server for structured, sequential thinking.
 
 [![npm version](https://img.shields.io/npm/v/@j0hanz/thinkseq-mcp.svg)](https://www.npmjs.com/package/@j0hanz/thinkseq-mcp)
 
@@ -14,7 +14,7 @@ An MCP implementation for advanced reasoning and thinking sequences.
 
 ## Overview
 
-ThinkSeq provides a single MCP tool, `thinkseq`, for structured, sequential thinking with branching and revision support. The server runs over stdio and keeps an in-memory history of thoughts so it can return progress, branches, and a short context summary on each call.
+ThinkSeq provides a single MCP tool, `thinkseq`, for structured, sequential thinking. The server runs over stdio and keeps an in-memory history of thoughts so it can return progress and a short context summary on each call.
 
 ## Quick start
 
@@ -119,21 +119,16 @@ Add to your `~/.codeium/windsurf/mcp_config.json`:
 
 ## Tool: `thinkseq`
 
-Structured sequential thinking with branching and revision support.
+Structured sequential thinking for complex problem solving.
 
 ### Input
 
-| Field               | Type    | Required | Description                                                                |
-| :------------------ | :------ | :------: | :------------------------------------------------------------------------- |
-| `thought`           | string  |   yes    | Current thinking step (1 to 50000 chars).                                  |
-| `thoughtNumber`     | number  |   yes    | Current thought number in sequence (1 to 10000).                           |
-| `totalThoughts`     | number  |   yes    | Estimated total thoughts needed (1 to 10000).                              |
-| `nextThoughtNeeded` | boolean |   yes    | Whether another thought step is needed.                                    |
-| `isRevision`        | boolean |    no    | Marks this thought as a revision.                                          |
-| `revisesThought`    | number  |    no    | Thought number being revised (must exist).                                 |
-| `branchFromThought` | number  |    no    | Thought number to branch from (must exist).                                |
-| `branchId`          | string  |    no    | Branch identifier (1 to 100 chars).                                        |
-| `thoughtType`       | enum    |    no    | One of `analysis`, `hypothesis`, `verification`, `revision`, `conclusion`. |
+| Field               | Type    | Required | Description                                       |
+| :------------------ | :------ | :------: | :------------------------------------------------ |
+| `thought`           | string  |   yes    | Current thinking step (1 to 50000 chars).         |
+| `thoughtNumber`     | number  |   yes    | Current thought number in sequence (1 to 10000).  |
+| `totalThoughts`     | number  |   yes    | Estimated total thoughts needed (1 to 10000).     |
+| `nextThoughtNeeded` | boolean |   yes    | Whether another thought step is needed.           |
 
 ### Output
 
@@ -144,23 +139,20 @@ The tool returns JSON with a success or error shape:
 
 Result fields:
 
-| Field                  | Type     | Description                                          |
-| :--------------------- | :------- | :--------------------------------------------------- |
-| `thoughtNumber`        | number   | Stored thought number.                               |
-| `totalThoughts`        | number   | Effective total thoughts (at least `thoughtNumber`). |
-| `progress`             | number   | `thoughtNumber / totalThoughts` (0 to 1).            |
-| `nextThoughtNeeded`    | boolean  | Mirrors input.                                       |
-| `thoughtHistoryLength` | number   | Stored thought count after pruning.                  |
-| `branches`             | string[] | Known branch IDs.                                    |
-| `context`              | object   | Recent context summary (see below).                  |
+| Field                  | Type   | Description                                          |
+| :--------------------- | :----- | :--------------------------------------------------- |
+| `thoughtNumber`        | number | Stored thought number.                               |
+| `totalThoughts`        | number | Effective total thoughts (at least `thoughtNumber`). |
+| `progress`             | number | `thoughtNumber / totalThoughts` (0 to 1).            |
+| `nextThoughtNeeded`    | boolean| Mirrors input.                                       |
+| `thoughtHistoryLength` | number | Stored thought count after pruning.                  |
+| `context`              | object | Recent context summary (see below).                  |
 
 Context fields:
 
-| Field            | Type    | Description                                                              |
-| :--------------- | :------ | :----------------------------------------------------------------------- |
-| `recentThoughts` | array   | Up to the last 5 thoughts with `number`, `preview`, and optional `type`. |
-| `currentBranch`  | string  | Latest thought branch ID (if any).                                       |
-| `hasRevisions`   | boolean | Whether any revision has been recorded.                                  |
+| Field            | Type  | Description                                       |
+| :--------------- | :---- | :------------------------------------------------ |
+| `recentThoughts` | array | Up to the last 5 thoughts with `number` and `preview`. |
 
 ### Example
 
@@ -171,8 +163,7 @@ Input:
   "thought": "Break down the problem into steps.",
   "thoughtNumber": 1,
   "totalThoughts": 3,
-  "nextThoughtNeeded": true,
-  "thoughtType": "analysis"
+  "nextThoughtNeeded": true
 }
 ```
 
@@ -187,16 +178,13 @@ Output (success):
     "progress": 0.3333333333333333,
     "nextThoughtNeeded": true,
     "thoughtHistoryLength": 1,
-    "branches": [],
     "context": {
       "recentThoughts": [
         {
           "number": 1,
-          "preview": "Break down the problem into steps.",
-          "type": "analysis"
+          "preview": "Break down the problem into steps."
         }
-      ],
-      "hasRevisions": false
+      ]
     }
   }
 }
@@ -206,7 +194,6 @@ Output (success):
 
 - Inputs are validated with Zod and unknown keys are rejected.
 - The first thought must have `thoughtNumber` 1.
-- `revisesThought` and `branchFromThought` must reference an existing thought number.
 - Gaps in thought sequence are allowed but emit a diagnostics event.
 - `totalThoughts` is adjusted up to at least `thoughtNumber`.
 - The engine stores thoughts in memory and prunes when limits are exceeded:

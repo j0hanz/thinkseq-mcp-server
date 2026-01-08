@@ -15,12 +15,11 @@ import { ThinkSeqOutputSchema } from '../schemas/outputs.js';
 
 const THINKSEQ_TOOL_DEFINITION = {
   title: 'Think Sequentially',
-  description: `Structured sequential thinking with branching and revision support.
+  description: `Structured sequential thinking for complex problem solving.
 
 Use for:
 - Breaking down complex problems into steps
-- Exploring alternative solution paths (branching)
-- Revising earlier thinking based on new insights
+- Multi-step reasoning and analysis
 
 Key parameters:
 - thought: Current thinking step
@@ -49,36 +48,6 @@ type ToolResponse =
       content: { type: 'text'; text: string }[];
       structuredContent: ProcessResult;
     };
-
-function getContextFields(input: ThinkSeqInput): Partial<ThoughtData> {
-  return {
-    ...(input.isRevision !== undefined && { isRevision: input.isRevision }),
-    ...(input.revisesThought !== undefined && {
-      revisesThought: input.revisesThought,
-    }),
-    ...(input.thoughtType !== undefined && { thoughtType: input.thoughtType }),
-  };
-}
-
-function getBranchFields(input: ThinkSeqInput): Partial<ThoughtData> {
-  return {
-    ...(input.branchFromThought !== undefined && {
-      branchFromThought: input.branchFromThought,
-    }),
-    ...(input.branchId !== undefined && { branchId: input.branchId }),
-  };
-}
-
-function normalizeThoughtInput(input: ThinkSeqInput): ThoughtData {
-  return {
-    thought: input.thought,
-    thoughtNumber: input.thoughtNumber,
-    totalThoughts: input.totalThoughts,
-    nextThoughtNeeded: input.nextThoughtNeeded,
-    ...getContextFields(input),
-    ...getBranchFields(input),
-  };
-}
 
 function publishToolStart(): void {
   publishToolEvent({
@@ -126,7 +95,12 @@ async function handleThinkSeq(
   input: ThinkSeqInput
 ): Promise<ToolResponse> {
   return runWithContext(async () => {
-    const normalized = normalizeThoughtInput(input);
+    const normalized: ThoughtData = {
+      thought: input.thought,
+      thoughtNumber: input.thoughtNumber,
+      totalThoughts: input.totalThoughts,
+      nextThoughtNeeded: input.nextThoughtNeeded,
+    };
     publishToolStart();
     const start = performance.now();
     try {

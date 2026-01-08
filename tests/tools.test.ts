@@ -95,44 +95,6 @@ void describe('tools.registerThinkSeq handler success', () => {
   });
 });
 
-void describe('tools.registerThinkSeq optional fields', () => {
-  void it('passes context and branch fields through', async () => {
-    const server = new FakeServer();
-    let seen: ThoughtData | undefined;
-    const engine = {
-      processThought: (input: ThoughtData): ProcessResult => {
-        seen = input;
-        return buildSuccessResult({
-          thoughtNumber: input.thoughtNumber,
-          totalThoughts: input.totalThoughts,
-          progress: input.thoughtNumber / input.totalThoughts,
-          nextThoughtNeeded: input.nextThoughtNeeded,
-        });
-      },
-    };
-
-    registerThinkSeq(server, engine);
-    assert.ok(server.registered);
-
-    const response = await server.registered.handler({
-      ...createThoughtInput(),
-      isRevision: true,
-      revisesThought: 1,
-      branchFromThought: 1,
-      branchId: 'branch-a',
-      thoughtType: 'analysis',
-    });
-
-    assert.ok(seen);
-    assert.equal(seen.isRevision, true);
-    assert.equal(seen.revisesThought, 1);
-    assert.equal(seen.branchFromThought, 1);
-    assert.equal(seen.branchId, 'branch-a');
-    assert.equal(seen.thoughtType, 'analysis');
-    assert.equal(response.structuredContent.ok, true);
-  });
-});
-
 void describe('tools.registerThinkSeq diagnostics durationMs (success)', () => {
   void it('publishes durationMs on success', async (t) => {
     const { messages } = captureDiagnostics(t, 'thinkseq:tool');
@@ -207,8 +169,7 @@ function buildSuccessResult(
       progress: 1,
       nextThoughtNeeded: false,
       thoughtHistoryLength: 1,
-      branches: [],
-      context: { recentThoughts: [], hasRevisions: false },
+      context: { recentThoughts: [] },
       ...overrides,
     },
   };

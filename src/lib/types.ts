@@ -1,20 +1,8 @@
-export type ThoughtType =
-  | 'analysis'
-  | 'hypothesis'
-  | 'verification'
-  | 'revision'
-  | 'conclusion';
-
 export interface ThoughtData {
   thought: string;
   thoughtNumber: number;
   totalThoughts: number;
   nextThoughtNeeded: boolean;
-  isRevision?: boolean;
-  revisesThought?: number;
-  branchFromThought?: number;
-  branchId?: string;
-  thoughtType?: ThoughtType;
 }
 
 export interface StoredThought extends ThoughtData {
@@ -25,10 +13,7 @@ export interface ContextSummary {
   recentThoughts: readonly {
     number: number;
     preview: string;
-    type?: ThoughtType;
   }[];
-  currentBranch?: string;
-  hasRevisions: boolean;
 }
 
 export type ProcessResult =
@@ -40,7 +25,6 @@ export type ProcessResult =
         progress: number;
         nextThoughtNeeded: boolean;
         thoughtHistoryLength: number;
-        branches: readonly string[];
         context: ContextSummary;
       };
       error?: never;

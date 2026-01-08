@@ -17,27 +17,4 @@ export const ThinkSeqInputSchema = z.strictObject({
   nextThoughtNeeded: z
     .boolean()
     .describe('Whether another thought step is needed'),
-  isRevision: z
-    .boolean()
-    .optional()
-    .describe('Whether this revises previous thinking'),
-  revisesThought: z
-    .number()
-    .int()
-    .min(1)
-    .max(9007199254740991)
-    .optional()
-    .describe('Which thought number is being reconsidered'),
-  branchFromThought: z
-    .number()
-    .int()
-    .min(1)
-    .max(9007199254740991)
-    .optional()
-    .describe('Branching point thought number'),
-  branchId: z.string().min(1).max(100).optional().describe('Branch identifier'),
-  thoughtType: z
-    .enum(['analysis', 'hypothesis', 'verification', 'revision', 'conclusion'])
-    .optional()
-    .describe('Type of thinking step (helps with context selection)'),
 });

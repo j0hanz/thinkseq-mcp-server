@@ -12,10 +12,8 @@ const OK_TRUE_OUTPUT = {
     progress: 0.5,
     nextThoughtNeeded: true,
     thoughtHistoryLength: 1,
-    branches: [],
     context: {
       recentThoughts: [],
-      hasRevisions: false,
     },
   },
 } as const;
@@ -39,10 +37,8 @@ const OK_TRUE_WITH_BOTH_OUTPUT = {
     totalThoughts: 1,
     nextThoughtNeeded: false,
     thoughtHistoryLength: 1,
-    branches: [],
     context: {
       recentThoughts: [],
-      hasRevisions: false,
     },
   },
   error: {
