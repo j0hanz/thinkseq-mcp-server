@@ -38,7 +38,7 @@ interface EngineLike {
     | Promise<ReturnType<ThinkingEngine['processThought']>>;
 }
 
-type ThinkSeqInput = z.infer<z.ZodObject<typeof ThinkSeqInputSchema>>;
+type ThinkSeqInput = z.infer<typeof ThinkSeqInputSchema>;
 type ThinkSeqOutput = z.infer<typeof ThinkSeqOutputSchema>;
 
 type ToolResponse =

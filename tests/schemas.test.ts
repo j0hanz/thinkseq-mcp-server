@@ -1,10 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import {
-  ThinkSeqInputSchema,
-  ThinkSeqInputValidator,
-} from '../src/schemas/inputs.js';
+import { ThinkSeqInputSchema } from '../src/schemas/inputs.js';
 import { ThinkSeqOutputSchema } from '../src/schemas/outputs.js';
 
 const VALID_RESULT = {
@@ -33,7 +30,7 @@ void describe('ThinkSeqInputSchema', () => {
       totalThoughts: 2,
     };
 
-    const result = ThinkSeqInputValidator.safeParse(input);
+    const result = ThinkSeqInputSchema.safeParse(input);
     assert.equal(result.success, true);
   });
 
@@ -42,7 +39,7 @@ void describe('ThinkSeqInputSchema', () => {
       thought: 'step',
     };
 
-    const result = ThinkSeqInputValidator.safeParse(input);
+    const result = ThinkSeqInputSchema.safeParse(input);
     assert.equal(result.success, true);
     if (result.success) {
       assert.equal(result.data.totalThoughts, 3);
@@ -56,16 +53,12 @@ void describe('ThinkSeqInputSchema', () => {
       extra: 'nope',
     };
 
-    const result = ThinkSeqInputValidator.safeParse(input);
+    const result = ThinkSeqInputSchema.safeParse(input);
     assert.equal(result.success, false);
   });
 
-  void it('exports raw shape for MCP SDK', () => {
-    // Verify the exported schema is a raw shape (object with Zod types)
-    assert.ok(ThinkSeqInputSchema.thought);
-    assert.ok(ThinkSeqInputSchema.totalThoughts);
-    assert.ok(ThinkSeqInputSchema.thought._def);
-    assert.ok(ThinkSeqInputSchema.totalThoughts._def);
+  void it('exports a Zod schema for MCP SDK', () => {
+    assert.equal(typeof ThinkSeqInputSchema.safeParse, 'function');
   });
 });
 

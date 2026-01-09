@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const ThinkSeqResultSchema = z.object({
+const ThinkSeqResultSchema = z.object({
   thoughtNumber: z.number(),
   totalThoughts: z.number(),
   progress: z.number().min(0).max(1),

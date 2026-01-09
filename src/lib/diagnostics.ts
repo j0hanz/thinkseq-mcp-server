@@ -36,18 +36,8 @@ export type LifecycleEvent =
   | { type: 'lifecycle.started'; ts: number }
   | { type: 'lifecycle.shutdown'; ts: number; signal: string };
 
-interface EngineEventBase {
-  type: 'engine.sequence_gap';
-  ts: number;
-  expected: number;
-  received: number;
-}
-
-export type EngineEvent = EngineEventBase & { context?: EventContext };
-
 const toolChannel = diagnosticsChannel.channel('thinkseq:tool');
 const lifecycleChannel = diagnosticsChannel.channel('thinkseq:lifecycle');
-const engineChannel = diagnosticsChannel.channel('thinkseq:engine');
 
 function safePublish(
   channel: diagnosticsChannel.Channel,
@@ -80,8 +70,4 @@ export function publishToolEvent(event: ToolEvent): void {
 
 export function publishLifecycleEvent(event: LifecycleEvent): void {
   safePublish(lifecycleChannel, event);
-}
-
-export function publishEngineEvent(event: EngineEvent): void {
-  safePublish(engineChannel, attachContext(event));
 }

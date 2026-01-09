@@ -21,17 +21,6 @@ export function captureDiagnostics(
   return { messages };
 }
 
-export function assertSequenceGapMessage(
-  messages: unknown[],
-  expected: number,
-  received: number
-): void {
-  const msg = getSingleMessage(messages);
-  assert.equal(msg.type, 'engine.sequence_gap');
-  assert.equal(msg.expected, expected);
-  assert.equal(msg.received, received);
-}
-
 export function getSingleMessage(messages: unknown[]): Record<string, unknown> {
   assert.equal(messages.length, 1);
   const msg = messages[0];

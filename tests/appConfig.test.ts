@@ -1,16 +1,14 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import type {
-  RunDependencies,
-  ServerLike,
-  ShutdownDependencies,
-} from '../src/appConfig.js';
+import type { RunDependencies } from '../src/appConfig.js';
 import {
   buildShutdownDependencies,
   resolvePackageIdentity,
   resolveRunDependencies,
 } from '../src/appConfig.js';
+import type { ShutdownDependencies } from '../src/appConfig/shutdown.js';
+import type { ServerLike } from '../src/appConfig/types.js';
 import { ThinkingEngine } from '../src/engine.js';
 
 type ProcessStub = {

@@ -4,15 +4,10 @@ import { describe, it } from 'node:test';
 import type { TestContext } from 'node:test';
 
 import {
-  publishEngineEvent,
   publishLifecycleEvent,
   publishToolEvent,
 } from '../src/lib/diagnostics.js';
-import {
-  assertSequenceGapMessage,
-  captureDiagnostics,
-  getSingleMessage,
-} from './helpers/diagnostics.js';
+import { captureDiagnostics, getSingleMessage } from './helpers/diagnostics.js';
 
 void describe('publishToolEvent.basic', () => {
   void it('does not throw without subscribers', () => {
@@ -86,55 +81,6 @@ void describe('publishLifecycleEvent.errors', () => {
     });
     assert.doesNotThrow(() => {
       publishLifecycleEvent({ type: 'lifecycle.started', ts: Date.now() });
-    });
-  });
-});
-
-void describe('publishEngineEvent.basic', () => {
-  void it('does not throw without subscribers', () => {
-    assert.doesNotThrow(() => {
-      publishEngineEvent({
-        type: 'engine.sequence_gap',
-        ts: Date.now(),
-        expected: 2,
-        received: 5,
-      });
-    });
-  });
-
-  void it('publishes when subscribed', async (t) => {
-    const { messages } = captureDiagnostics(t, 'thinkseq:engine');
-
-    publishEngineEvent({
-      type: 'engine.sequence_gap',
-      ts: 999,
-      expected: 2,
-      received: 10,
-    });
-
-    await Promise.resolve();
-
-    assertSequenceGapMessage(messages, 2, 10);
-  });
-});
-
-void describe('publishEngineEvent.errors', () => {
-  void it('swallows publish errors', (t) => {
-    withPublishFailure(t, 'thinkseq:engine', () => {
-      publishEngineEvent({
-        type: 'engine.sequence_gap',
-        ts: Date.now(),
-        expected: 2,
-        received: 5,
-      });
-    });
-    assert.doesNotThrow(() => {
-      publishEngineEvent({
-        type: 'engine.sequence_gap',
-        ts: Date.now(),
-        expected: 2,
-        received: 5,
-      });
     });
   });
 });

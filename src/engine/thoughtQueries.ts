@@ -4,7 +4,7 @@ import type {
   StoredThought,
 } from '../lib/types.js';
 
-export function getRecentActiveThoughts(
+function getRecentActiveThoughts(
   activeThoughts: readonly StoredThought[],
   limit: number
 ): StoredThought[] {
