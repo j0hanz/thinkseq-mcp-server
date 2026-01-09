@@ -46,7 +46,7 @@ void describe('ThinkSeqInputSchema', () => {
     }
   });
 
-  void it('rejects unknown keys', () => {
+  void it('strips unknown keys', () => {
     const input = {
       thought: 'step',
       totalThoughts: 2,
@@ -54,7 +54,10 @@ void describe('ThinkSeqInputSchema', () => {
     };
 
     const result = ThinkSeqInputSchema.safeParse(input);
-    assert.equal(result.success, false);
+    assert.equal(result.success, true);
+    if (result.success) {
+      assert.ok(!('extra' in result.data));
+    }
   });
 
   void it('exports a Zod schema for MCP SDK', () => {

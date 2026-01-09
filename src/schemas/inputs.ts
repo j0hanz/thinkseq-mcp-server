@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const ThinkSeqInputSchema = z.strictObject({
+export const ThinkSeqInputSchema = z.object({
   thought: z.string().min(1).max(2000).describe('Your current thinking step'),
   totalThoughts: z
     .number()
