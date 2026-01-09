@@ -2,64 +2,69 @@
 
 ## Project Overview
 
-- **Goal**: Provides an MCP server (`thinkseq`) for structured, sequential thinking with branching and revision support.
-- **Stack**: Node.js (>=20), TypeScript (ES2022/NodeNext), MCP SDK, Zod, native Node test runner.
+- **Name**: ThinkSeq MCP Server (`@j0hanz/thinkseq-mcp`)
+- **Description**: An MCP server for structured, sequential thinking, running over stdio.
+- **Stack**: Node.js (>=20), TypeScript, MCP SDK (`@modelcontextprotocol/sdk`), Zod.
 
 ## Repo Map / Structure
 
-- `src/`: Source code
-  - `app.ts`: MCP server application setup and wiring.
-  - `engine.ts`: Core thinking engine logic (in-memory state management).
-  - `index.ts`: Application entry point.
-  - `lib/`: Shared utilities (diagnostics, protocol guards, stdio guards).
-  - `schemas/`: Zod schemas for validation inputs/outputs.
-  - `tools/`: Tool definitions (specifically `thinkseq.ts`).
-- `tests/`: Unit tests matching source structure (e.g., `engine.test.ts`).
-- `benchmark/`: Performance benchmark scripts.
-- `dist/`: Compiled JavaScript output (generated).
-- `docs/`: Documentation assets and deep dives.
+- `.github/`: CI workflows and prompts.
+- `benchmark/`: Performance benchmarks (`engine.bench.ts`).
+- `dist/`: Build output (compiled JS and type definitions).
+- `docs/`: Documentation assets.
+- `src/`: Source code.
+  - `engine/`: Core thinking logic (pruning, revision, queries).
+  - `lib/`: Utilities (diagnostics, errors, guards).
+  - `schemas/`: Zod schemas for inputs/outputs.
+  - `tools/`: MCP tool definitions (`thinkseq`).
+- `tests/`: Node.js test runner suite.
 
 ## Setup & Environment
 
+- **Prerequisites**: Node.js >= 20.0.0.
 - **Install dependencies**: `npm install`
-- **Engine requirement**: Node.js >= 20.0.0
-- **Configuration**: Zero-config; runs over stdio. No `.env` required for basic operation.
+- **Main config**: `package.json` (scripts, deps), `tsconfig.json` (build), `eslint.config.mjs` (linting).
 
 ## Development Workflow
 
-- **Dev mode**: `npm run dev` (runs `src/index.ts` with `tsx` in watch mode)
-- **type-check**: `npm run type-check` (runs `tsc` without emitting files)
-- **Start production**: `npm start` (runs `dist/index.js`)
-- **Inspector**: `npm run inspector` (launches MCP inspector)
+- **Dev mode**: `npm run dev` (runs `tsx watch src/index.ts`).
+- **Build**: `npm run build` (runs `tsc`).
+- **Start (production)**: `npm start` (runs `node dist/index.js`).
+- **Inspect**: `npm run inspector` (runs `@modelcontextprotocol/inspector`).
 
 ## Testing
 
-- **Run all tests**: `npm test` (uses Node.js native test runner)
-- **Run with coverage**: `npm run test:coverage`
-- **Benchmarks**: `npm run benchmark`
-- **Test location**: Files ending in `.test.ts` inside `tests/`.
+- **Run all tests**: `npm test` (uses Node.js native test runner).
+- **Test with coverage**: `npm run test:coverage`
+- **Benchmark**: `npm run benchmark`
+- **Test location**: `tests/*.test.ts`
 
 ## Code Style & Conventions
 
-- **Language**: TypeScript (Target ES2022, Module NodeNext).
-- **Lint**: `npm run lint` (ESLint 9).
+- **Language**: TypeScript 5.x.
+- **Lint**: `npm run lint` (ESLint).
 - **Format**: `npm run format` (Prettier).
-- **Check format**: `npm run format:check`.
-- **Imports**: Uses `tsx` for execution during dev/test. Explicit extensions required in imports where applicable due to `NodeNext`.
+- **Check types**: `npm run type-check` (tsc noEmit).
+- **Check format**: `npm run format:check`
 
 ## Build / Release
 
-- **Build command**: `npm run build` (runs `tsc`).
-- **Clean**: `npm run clean` (removes `dist/`).
-- **Output directory**: `dist/` contains the compiled JS and type definitions.
-- **Pre-publish**: `npm run prepublishOnly` ensures lint, type-check, and clean build before publishing.
+- **Build output**: `dist/` directory.
+- **Clean build**: `npm run clean`
+- **Pre-publish**: `npm run prepublishOnly` (lints, type-checks, and builds).
+- **Release**: Triggered by GitHub Release (published type). Actions workflow builds and publishes to npm.
 
 ## Security & Safety
 
-- **Stdio Isolation**: Server runs strictly over stdio; no external network ports opened by default.
-- **Input Validation**: All tool inputs strictly validated via Zod schemas (`src/schemas/inputs.ts`).
+- **Transport**: Standard Input/Output (stdio).
+- **Validation**: Uses Zod for strict input schema validation.
+- **Dependencies**: Minimal dependencies (`@modelcontextprotocol/sdk`, `zod`).
 
 ## Pull Request / Commit Guidelines
 
-- **Validation**: Ensure `npm run lint`, `npm run type-check`, and `npm test` pass before committing.
-- **Cleanliness**: Run `npm run format` to ensure code style compliance.
+- **Required checks**: CI runs `lint`, `type-check`, `test`, and `test:coverage`.
+- **Recommended**: Run `npm run lint && npm run type-check && npm run test` locally before pushing.
+
+## Troubleshooting
+
+- **Discrepancies**: CI workflow references `maintainability` and `duplication` scripts which are missing in `package.json`.
