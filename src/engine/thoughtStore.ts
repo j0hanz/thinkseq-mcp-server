@@ -154,9 +154,9 @@ export class ThoughtStore {
 
   #shouldCompact(force: boolean): boolean {
     if (force) return true;
-    return !(
-      this.#headIndex < COMPACT_THRESHOLD &&
-      this.#headIndex < this.#thoughts.length * COMPACT_RATIO
+    return (
+      this.#headIndex >= COMPACT_THRESHOLD ||
+      this.#headIndex >= this.#thoughts.length * COMPACT_RATIO
     );
   }
 
