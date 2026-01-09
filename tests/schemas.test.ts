@@ -1,18 +1,13 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { z } from 'zod';
-
 import {
   ThinkSeqInputSchema,
   ThinkSeqInputValidator,
 } from '../src/schemas/inputs.js';
 import { ThinkSeqOutputSchema } from '../src/schemas/outputs.js';
 
-// Create a validator from output schema shape for testing
-const OutputValidator = z.object(ThinkSeqOutputSchema);
-
-const VALID_OUTPUT = {
+const VALID_RESULT = {
   thoughtNumber: 1,
   totalThoughts: 2,
   progress: 0.5,
@@ -24,6 +19,11 @@ const VALID_OUTPUT = {
   context: {
     recentThoughts: [],
   },
+} as const;
+
+const VALID_OUTPUT = {
+  ok: true,
+  result: VALID_RESULT,
 } as const;
 
 void describe('ThinkSeqInputSchema', () => {
@@ -71,33 +71,27 @@ void describe('ThinkSeqInputSchema', () => {
 
 void describe('ThinkSeqOutputSchema', () => {
   void it('accepts valid output shape', () => {
-    const result = OutputValidator.safeParse(VALID_OUTPUT);
+    const result = ThinkSeqOutputSchema.safeParse(VALID_OUTPUT);
     assert.equal(result.success, true);
   });
 
   void it('rejects missing fields', () => {
-    const result = OutputValidator.safeParse({ thoughtNumber: 1 });
+    const result = ThinkSeqOutputSchema.safeParse({ ok: true });
     assert.equal(result.success, false);
   });
 
   void it('rejects invalid progress range', () => {
-    const result = OutputValidator.safeParse({
-      ...VALID_OUTPUT,
-      progress: 1.5,
+    const result = ThinkSeqOutputSchema.safeParse({
+      ok: true,
+      result: {
+        ...VALID_RESULT,
+        progress: 1.5,
+      },
     });
     assert.equal(result.success, false);
   });
 
-  void it('exports raw shape for MCP SDK', () => {
-    // Verify the exported schema is a raw shape (object with Zod types)
-    assert.ok(ThinkSeqOutputSchema.thoughtNumber);
-    assert.ok(ThinkSeqOutputSchema.totalThoughts);
-    assert.ok(ThinkSeqOutputSchema.progress);
-    assert.ok(ThinkSeqOutputSchema.isComplete);
-    assert.ok(ThinkSeqOutputSchema.thoughtHistoryLength);
-    assert.ok(ThinkSeqOutputSchema.hasRevisions);
-    assert.ok(ThinkSeqOutputSchema.activePathLength);
-    assert.ok(ThinkSeqOutputSchema.revisableThoughts);
-    assert.ok(ThinkSeqOutputSchema.context);
+  void it('exports a Zod schema for MCP SDK', () => {
+    assert.equal(typeof ThinkSeqOutputSchema.safeParse, 'function');
   });
 });

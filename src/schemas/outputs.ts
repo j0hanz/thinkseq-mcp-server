@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const ThinkSeqOutputSchema = {
+export const ThinkSeqResultSchema = z.object({
   thoughtNumber: z.number(),
   totalThoughts: z.number(),
   progress: z.number().min(0).max(1),
@@ -29,4 +29,40 @@ export const ThinkSeqOutputSchema = {
       })
       .optional(),
   }),
-};
+});
+
+const ThinkSeqErrorSchema = z.object({
+  code: z.string(),
+  message: z.string(),
+});
+
+export const ThinkSeqOutputSchema = z
+  .object({
+    ok: z.boolean(),
+    result: ThinkSeqResultSchema.optional(),
+    error: ThinkSeqErrorSchema.optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.ok) {
+      if (!value.result) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['result'],
+          message: 'result is required when ok is true',
+        });
+      }
+      if (value.error) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['error'],
+          message: 'error must be undefined when ok is true',
+        });
+      }
+    } else if (!value.error) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['error'],
+        message: 'error is required when ok is false',
+      });
+    }
+  });

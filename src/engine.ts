@@ -1,12 +1,5 @@
-import { collectRemovedBytes } from './engine/pruning.js';
 import { resolveRevisionTarget } from './engine/revision.js';
-import {
-  buildContextSummary,
-  collectSupersededChain,
-  findThoughtByNumber,
-  getActiveThoughts,
-  getRevisableThoughtNumbers,
-} from './engine/thoughtQueries.js';
+import { buildContextSummary } from './engine/thoughtQueries.js';
 import {
   COMPACT_RATIO,
   COMPACT_THRESHOLD,
@@ -31,6 +24,9 @@ export interface ThinkingEngineOptions {
 
 export class ThinkingEngine {
   #thoughts: StoredThought[] = [];
+  #thoughtIndex = new Map<number, StoredThought>();
+  #activeThoughts: StoredThought[] = [];
+  #activeThoughtNumbers: number[] = [];
   #headIndex = 0;
   #estimatedBytes = 0;
   #hasRevisions = false;
@@ -71,21 +67,14 @@ export class ThinkingEngine {
   }
 
   #processRevision(input: ThoughtData): ProcessResult {
-    const resolved = resolveRevisionTarget(
-      input,
-      this.#thoughts,
-      this.#headIndex
+    const resolved = resolveRevisionTarget(input, (thoughtNumber) =>
+      this.#thoughtIndex.get(thoughtNumber)
     );
     if (!resolved.ok) return resolved.error;
     const { targetNumber } = resolved;
 
     const numbers = this.#nextThoughtNumbers(input.totalThoughts);
-    const supersedes = collectSupersededChain(
-      this.#thoughts,
-      this.#headIndex,
-      targetNumber
-    );
-    this.#applySupersedes(supersedes, numbers.thoughtNumber);
+    const supersedes = this.#supersedeFrom(targetNumber, numbers.thoughtNumber);
 
     const stored = this.#buildStoredThought(input, {
       ...numbers,
@@ -133,18 +122,31 @@ export class ThinkingEngine {
     };
   }
 
-  #applySupersedes(supersedes: number[], supersededBy: number): void {
-    for (const num of supersedes) {
-      const thought = findThoughtByNumber(this.#thoughts, this.#headIndex, num);
-      if (thought?.isActive) {
+  #supersedeFrom(targetNumber: number, supersededBy: number): number[] {
+    const startIndex = this.#activeThoughtNumbers.indexOf(targetNumber);
+    if (startIndex < 0) return [];
+    const supersedes: number[] = [];
+    for (let i = startIndex; i < this.#activeThoughts.length; i += 1) {
+      const thought = this.#activeThoughts[i];
+      if (!thought) continue;
+      if (thought.isActive) {
         thought.isActive = false;
         thought.supersededBy = supersededBy;
       }
+      supersedes.push(thought.thoughtNumber);
     }
+    this.#activeThoughts.length = startIndex;
+    this.#activeThoughtNumbers.length = startIndex;
+    return supersedes;
   }
 
   #storeThought(stored: StoredThought): void {
     this.#thoughts.push(stored);
+    this.#thoughtIndex.set(stored.thoughtNumber, stored);
+    if (stored.isActive) {
+      this.#activeThoughts.push(stored);
+      this.#activeThoughtNumbers.push(stored.thoughtNumber);
+    }
     this.#estimatedBytes += this.#estimateThoughtBytes(stored);
   }
 
@@ -152,10 +154,10 @@ export class ThinkingEngine {
     stored: StoredThought,
     revisionInfo?: RevisionInfo
   ): ProcessResult {
-    const activeThoughts = getActiveThoughts(this.#thoughts, this.#headIndex);
+    const activeThoughts = this.#activeThoughts;
     const context = buildContextSummary(activeThoughts, revisionInfo);
     const isComplete = stored.thoughtNumber >= stored.totalThoughts;
-    const revisableThoughts = getRevisableThoughtNumbers(activeThoughts);
+    const revisableThoughts = this.#activeThoughtNumbers.slice();
 
     return {
       ok: true,
@@ -217,6 +219,19 @@ export class ThinkingEngine {
     return thought.thought.length * 2 + this.#estimatedThoughtOverheadBytes;
   }
 
+  #dropActiveThoughtsUpTo(thoughtNumber: number): void {
+    if (this.#activeThoughts.length === 0) return;
+    let startIndex = 0;
+    while (startIndex < this.#activeThoughts.length) {
+      const thought = this.#activeThoughts[startIndex];
+      if (!thought || thought.thoughtNumber > thoughtNumber) break;
+      startIndex += 1;
+    }
+    if (startIndex === 0) return;
+    this.#activeThoughts = this.#activeThoughts.slice(startIndex);
+    this.#activeThoughtNumbers = this.#activeThoughtNumbers.slice(startIndex);
+  }
+
   #removeOldest(count: number, options: { forceCompact?: boolean } = {}): void {
     const totalLength = this.#totalLength();
     if (count <= 0 || totalLength === 0) return;
@@ -224,23 +239,33 @@ export class ThinkingEngine {
     const start = this.#headIndex;
     const end = start + actual;
     const forceCompact = options.forceCompact ?? false;
-    const removedBytes = collectRemovedBytes(
-      this.#thoughts,
-      start,
-      end,
-      (thought) => this.#estimateThoughtBytes(thought)
-    );
+    let removedBytes = 0;
+    let removedMaxThoughtNumber = -1;
+    for (let index = start; index < end; index += 1) {
+      const thought = this.#thoughts[index];
+      if (!thought) continue;
+      removedBytes += this.#estimateThoughtBytes(thought);
+      this.#thoughtIndex.delete(thought.thoughtNumber);
+      removedMaxThoughtNumber = thought.thoughtNumber;
+    }
     this.#estimatedBytes -= removedBytes;
     this.#headIndex = end;
     if (this.#totalLength() === 0) {
       this.#resetThoughts();
       return;
     }
+    if (removedMaxThoughtNumber >= 0) {
+      this.#dropActiveThoughtsUpTo(removedMaxThoughtNumber);
+    }
     this.#compactIfNeeded(forceCompact);
   }
 
   #resetThoughts(): void {
     this.#thoughts = [];
+    this.#thoughtIndex.clear();
+    this.#activeThoughts = [];
+    this.#activeThoughtNumbers = [];
     this.#headIndex = 0;
+    this.#estimatedBytes = 0;
   }
 }

@@ -3,12 +3,10 @@ import type {
   StoredThought,
   ThoughtData,
 } from '../lib/types.js';
-import { findThoughtByNumber } from './thoughtQueries.js';
 
 export function resolveRevisionTarget(
   input: ThoughtData,
-  thoughts: StoredThought[],
-  headIndex: number
+  getThoughtByNumber: (thoughtNumber: number) => StoredThought | undefined
 ): { ok: true; targetNumber: number } | { ok: false; error: ProcessResult } {
   const targetNumberResult = getRevisionTargetNumber(input);
   if (!targetNumberResult.ok) {
@@ -16,8 +14,7 @@ export function resolveRevisionTarget(
   }
 
   const validationError = validateRevisionTarget(
-    thoughts,
-    headIndex,
+    getThoughtByNumber,
     targetNumberResult.targetNumber
   );
 
@@ -46,11 +43,10 @@ function getRevisionTargetNumber(
 }
 
 function validateRevisionTarget(
-  thoughts: StoredThought[],
-  headIndex: number,
+  getThoughtByNumber: (thoughtNumber: number) => StoredThought | undefined,
   targetNumber: number
 ): ProcessResult | undefined {
-  const target = findThoughtByNumber(thoughts, headIndex, targetNumber);
+  const target = getThoughtByNumber(targetNumber);
   if (!target) {
     return buildRevisionError(
       'E_REVISION_TARGET_NOT_FOUND',

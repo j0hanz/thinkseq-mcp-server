@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
+import type { z } from 'zod';
+
 import type { ThinkingEngine } from '../src/engine.js';
-import type { ErrorResponse } from '../src/lib/errors.js';
 import type { ThoughtData } from '../src/lib/types.js';
 import type { ProcessResult } from '../src/lib/types.js';
 import { ThinkSeqInputSchema } from '../src/schemas/inputs.js';
@@ -10,7 +11,7 @@ import { ThinkSeqOutputSchema } from '../src/schemas/outputs.js';
 import { registerThinkSeq } from '../src/tools/thinkseq.js';
 import { captureDiagnostics } from './helpers/diagnostics.js';
 
-type StructuredResponse = ProcessResult | ErrorResponse['structuredContent'];
+type StructuredResponse = z.infer<typeof ThinkSeqOutputSchema>;
 type ToolRegistrar = Parameters<typeof registerThinkSeq>[0];
 
 interface RegisteredTool {
@@ -83,8 +84,8 @@ void describe('tools.registerThinkSeq handler success', () => {
     const input = createThoughtInput();
     const response = await server.registered.handler(input);
 
-    // structuredContent now contains result fields directly (no ok wrapper)
-    assert.deepEqual(response.structuredContent.thoughtNumber, 1);
+    assert.equal(response.structuredContent.ok, true);
+    assert.deepEqual(response.structuredContent.result?.thoughtNumber, 1);
     assert.equal(response.isError, undefined);
     assert.equal(
       response.content[0].text,
@@ -143,7 +144,7 @@ void describe('tools.registerThinkSeq handler error', () => {
     const response = await server.registered.handler(input);
     assert.equal(response.isError, true);
     assert.deepEqual(response.structuredContent.ok, false);
-    assert.deepEqual(response.structuredContent.error.code, 'E_THINK');
+    assert.deepEqual(response.structuredContent.error?.code, 'E_THINK');
   });
 });
 
@@ -167,6 +168,9 @@ function buildSuccessResult(
       progress: 1,
       isComplete: true,
       thoughtHistoryLength: 1,
+      hasRevisions: false,
+      activePathLength: 1,
+      revisableThoughts: [1],
       context: { recentThoughts: [] },
       ...overrides,
     },

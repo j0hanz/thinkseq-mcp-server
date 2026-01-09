@@ -39,31 +39,14 @@ interface EngineLike {
 }
 
 type ThinkSeqInput = z.infer<z.ZodObject<typeof ThinkSeqInputSchema>>;
-
-interface StructuredResult {
-  [x: string]: unknown;
-  thoughtNumber: number;
-  totalThoughts: number;
-  progress: number;
-  isComplete: boolean;
-  thoughtHistoryLength: number;
-  hasRevisions: boolean;
-  activePathLength: number;
-  revisableThoughts: number[];
-  context: {
-    recentThoughts: readonly { number: number; preview: string }[];
-    revisionInfo?: {
-      revises: number;
-      supersedes: number[];
-    };
-  };
-}
+type ThinkSeqOutput = z.infer<typeof ThinkSeqOutputSchema>;
 
 type ToolResponse =
   | ErrorResponse
   | {
       content: { type: 'text'; text: string }[];
-      structuredContent: StructuredResult;
+      structuredContent: ThinkSeqOutput;
+      isError?: boolean;
     };
 
 function publishToolStart(): void {
@@ -100,9 +83,19 @@ function buildSuccessResponse(result: ProcessResult): ToolResponse {
   if (!result.ok) {
     return createErrorResponse(result.error.code, result.error.message);
   }
+  const structured: ThinkSeqOutput = {
+    ok: true,
+    result: {
+      ...result.result,
+      context: {
+        ...result.result.context,
+        recentThoughts: [...result.result.context.recentThoughts],
+      },
+    },
+  };
   return {
-    content: [{ type: 'text', text: JSON.stringify(result.result) }],
-    structuredContent: result.result,
+    content: [{ type: 'text', text: JSON.stringify(structured) }],
+    structuredContent: structured,
   };
 }
 
