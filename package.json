@@ -1,6 +1,6 @@
 {
   "name": "@j0hanz/thinkseq-mcp",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "mcpName": "io.github.j0hanz/thinkseq",
   "description": "An thinking and reasoning engine for the Model Context Protocol (MCP).",
   "type": "module",
