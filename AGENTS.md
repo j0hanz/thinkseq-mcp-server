@@ -2,69 +2,85 @@
 
 ## Project Overview
 
-- **Name**: ThinkSeq MCP Server (`@j0hanz/thinkseq-mcp`)
-- **Description**: An MCP server for structured, sequential thinking, running over stdio.
-- **Stack**: Node.js (>=20), TypeScript, MCP SDK (`@modelcontextprotocol/sdk`), Zod.
+- **What this repo is:** An MCP (Model Context Protocol) stdio server that exposes a single tool, `thinkseq`, for structured sequential thinking with in-memory history and revision support.
+- **Primary stack:** TypeScript (ESM, NodeNext) + `@modelcontextprotocol/sdk` + Zod v4.
+- **Entry point:** `src/index.ts` (CLI wrapper) → `src/app.ts` (server wiring). Build output is `dist/index.js`.
 
 ## Repo Map / Structure
 
-- `.github/`: CI workflows and prompts.
-- `benchmark/`: Performance benchmarks (`engine.bench.ts`).
-- `dist/`: Build output (compiled JS and type definitions).
-- `docs/`: Documentation assets.
-- `src/`: Source code.
-  - `engine/`: Core thinking logic (pruning, revision, queries).
-  - `lib/`: Utilities (diagnostics, errors, guards).
-  - `schemas/`: Zod schemas for inputs/outputs.
-  - `tools/`: MCP tool definitions (`thinkseq`).
-- `tests/`: Node.js test runner suite.
+- `src/`: TypeScript source
+  - `src/index.ts`: CLI entry (help/config parsing) and server startup
+  - `src/app.ts`: App bootstrap + MCP wiring + shutdown hooks
+  - `src/engine.ts`: Core `ThinkingEngine` (in-memory thought + revision processing)
+  - `src/schemas/`: Zod schemas for tool inputs/outputs
+  - `src/lib/`: Shared utilities (cli, diagnostics, errors, protocol/stdio guards, etc.)
+  - `src/tools/`: MCP tool registration (includes `thinkseq`)
+- `tests/`: Node.js test runner tests (`*.test.ts`) + helpers
+- `benchmark/`: Benchmarks (see `npm run benchmark`)
+- `scripts/`: Repo automation (notably `scripts/Quality-Gates.ps1`) and metrics JSONs
+- `metrics/`: Generated metric snapshots (JSON)
+- `docs/`: Repo assets (currently `docs/logo.png`)
+- `dist/`: Build output (generated)
 
 ## Setup & Environment
 
-- **Prerequisites**: Node.js >= 20.0.0.
-- **Install dependencies**: `npm install`
-- **Main config**: `package.json` (scripts, deps), `tsconfig.json` (build), `eslint.config.mjs` (linting).
+- **Node.js:** `>=20.0.0` (see `package.json` `engines.node`).
+- **Package manager:** npm (repo has `package-lock.json`).
+- Install deps (clean): `npm ci`
+- Install deps (dev): `npm install`
 
 ## Development Workflow
 
-- **Dev mode**: `npm run dev` (runs `tsx watch src/index.ts`).
-- **Build**: `npm run build` (runs `tsc`).
-- **Start (production)**: `npm start` (runs `node dist/index.js`).
-- **Inspect**: `npm run inspector` (runs `@modelcontextprotocol/inspector`).
+- Dev/watch mode (runs from TS sources): `npm run dev`
+- Build (emits `dist/`): `npm run build`
+- Run built server locally: `npm start`
+- Inspect with MCP Inspector (interactive UI): `npm run inspector`
+
+Note: The published binary is `thinkseq` (see `package.json` `bin`) which points to `dist/index.js`.
 
 ## Testing
 
-- **Run all tests**: `npm test` (uses Node.js native test runner).
-- **Test with coverage**: `npm run test:coverage`
-- **Benchmark**: `npm run benchmark`
-- **Test location**: `tests/*.test.ts`
+- All tests: `npm test`
+  - Uses Node’s built-in test runner with TS execution via `tsx/esm`.
+  - Test pattern: `tests/*.test.ts`.
+- CI-style tests (build first): `npm run test:ci`
+- Coverage: `npm run test:coverage`
 
 ## Code Style & Conventions
 
-- **Language**: TypeScript 5.x.
-- **Lint**: `npm run lint` (ESLint).
-- **Format**: `npm run format` (Prettier).
-- **Check types**: `npm run type-check` (tsc noEmit).
-- **Check format**: `npm run format:check`
+- **TypeScript mode:** `module: NodeNext`, `strict: true`, `exactOptionalPropertyTypes: true` (see `tsconfig.json`).
+- **ESM import rule:** local imports use `.js` extensions (NodeNext resolution).
+- **Lint:** `npm run lint` (ESLint flat config in `eslint.config.mjs`).
+  - Strict type-aware rules are enabled for `src/**/*.ts`.
+  - Notable conventions enforced by lint:
+    - Prefer `import { type X }` for type-only imports.
+    - Explicit return types on exported functions.
+    - No `any`.
+    - Naming conventions (camelCase/PascalCase, etc.).
+- **Format:** Prettier is configured; format with `npm run format` and verify with `npm run format:check`.
 
 ## Build / Release
 
-- **Build output**: `dist/` directory.
-- **Clean build**: `npm run clean`
-- **Pre-publish**: `npm run prepublishOnly` (lints, type-checks, and builds).
-- **Release**: Triggered by GitHub Release (published type). Actions workflow builds and publishes to npm.
+- Build output directory: `dist/`.
+- Build command: `npm run build` (TypeScript compile + sets executable mode on `dist/index.js`).
+- Release/publish:
+  - GitHub Action: `.github/workflows/publish.yml`
+  - Trigger: GitHub Release `published`
+  - Publishes to npm using **Trusted Publishing (OIDC)**.
 
 ## Security & Safety
 
-- **Transport**: Standard Input/Output (stdio).
-- **Validation**: Uses Zod for strict input schema validation.
-- **Dependencies**: Minimal dependencies (`@modelcontextprotocol/sdk`, `zod`).
+- **Transport:** stdio MCP server; avoid writing non-JSON-RPC output to stdout while running as an MCP server.
+- **State:** in-memory only (no DB); thoughts are not persisted across runs.
+- **Secrets:** do not commit credentials/tokens. Use environment variables / CI secrets.
+- **Input validation:** tool inputs/outputs are validated via Zod schemas in `src/schemas/`.
 
 ## Pull Request / Commit Guidelines
 
-- **Required checks**: CI runs `lint`, `type-check`, `test`, and `test:coverage`.
-- **Recommended**: Run `npm run lint && npm run type-check && npm run test` locally before pushing.
-
-## Troubleshooting
-
-- **Discrepancies**: CI workflow references `maintainability` and `duplication` scripts which are missing in `package.json`.
+- Run the local gates before submitting:
+  - `npm run lint`
+  - `npm run type-check`
+  - `npm test`
+  - `npm run build`
+- Keep changes minimal and consistent with existing patterns (ESM, `.js` import specifiers, strict typing).
+- No specific commit message convention is defined in-repo; follow your team’s default.
