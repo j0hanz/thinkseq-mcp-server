@@ -21,7 +21,7 @@ import type {
 } from './types.js';
 
 const SERVER_INSTRUCTIONS =
-  'ThinkSeq is a tool for structured, sequential thinking with branching and revision support.';
+  'ThinkSeq is a tool for structured, sequential thinking with revision support.';
 const DEFAULT_PACKAGE_READ_TIMEOUT_MS = 2000;
 
 export interface RunDependencies {
