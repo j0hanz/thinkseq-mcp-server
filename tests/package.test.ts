@@ -30,6 +30,30 @@ void describe('package.readSelfPackageJson', () => {
     assert.equal(pkg.version, expectedVersion);
   });
 
+  void it('does not depend on cwd when using default resolution', async () => {
+    const deps: PackageJsonDependencies = {
+      cwd: () => '/definitely-not-the-repo-root',
+    };
+
+    const raw = await readFile(
+      new URL('../package.json', import.meta.url),
+      'utf8'
+    );
+    const parsed: unknown = JSON.parse(raw);
+    const expectedName =
+      isRecord(parsed) && typeof parsed.name === 'string'
+        ? parsed.name
+        : undefined;
+    const expectedVersion =
+      isRecord(parsed) && typeof parsed.version === 'string'
+        ? parsed.version
+        : undefined;
+
+    const pkg = await readSelfPackageJson(undefined, deps);
+    assert.equal(pkg.name, expectedName);
+    assert.equal(pkg.version, expectedVersion);
+  });
+
   void it('uses provided readFile implementation', async () => {
     const deps: PackageJsonDependencies = {
       cwd: () => '/tmp',

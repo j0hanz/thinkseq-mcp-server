@@ -13,6 +13,7 @@ export class ThoughtStore {
   #activeThoughts: StoredThought[] = [];
   #activeThoughtNumbers: number[] = [];
   #headIndex = 0;
+  #nextThoughtNumber = 1;
   #estimatedBytes = 0;
   readonly #maxThoughts: number;
   readonly #maxMemoryBytes: number;
@@ -28,7 +29,8 @@ export class ThoughtStore {
     thoughtNumber: number;
     totalThoughts: number;
   } {
-    const thoughtNumber = this.getTotalLength() + 1;
+    const thoughtNumber = this.#nextThoughtNumber;
+    this.#nextThoughtNumber += 1;
     return {
       thoughtNumber,
       totalThoughts: Math.max(totalThoughts, thoughtNumber),
@@ -166,6 +168,7 @@ export class ThoughtStore {
     this.#activeThoughts = [];
     this.#activeThoughtNumbers = [];
     this.#headIndex = 0;
+    this.#nextThoughtNumber = 1;
     this.#estimatedBytes = 0;
   }
 }

@@ -1,11 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import {
-  ErrorCode,
-  McpError,
-  SUPPORTED_PROTOCOL_VERSIONS,
-} from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 import { installInitializationGuards } from '../src/lib/protocolGuards.js';
 
@@ -49,10 +45,7 @@ void describe('protocolGuards.installInitializationGuards', () => {
     installInitializationGuards(server);
 
     const initHandler = getHandler(handlers, 'initialize');
-    await initHandler(
-      { params: { protocolVersion: SUPPORTED_PROTOCOL_VERSIONS[0] } },
-      {}
-    );
+    await initHandler({ params: { protocolVersion: '2025-11-25' } }, {});
 
     const doHandler = getHandler(handlers, 'do');
     await doHandler({}, {});
@@ -86,6 +79,51 @@ void describe('protocolGuards.installInitializationGuards', () => {
     await assert.rejects(
       async () => {
         await initHandler({ params: { protocolVersion: '0.0.0' } }, {});
+      },
+      (err) => err instanceof McpError && err.code === ErrorCode.InvalidRequest
+    );
+  });
+
+  void it('rejects initialize when protocolVersion is missing', async () => {
+    const { handlers, server } = createServerStub();
+    handlers.set('initialize', async () => 'ok');
+
+    installInitializationGuards(server);
+
+    const initHandler = getHandler(handlers, 'initialize');
+    await assert.rejects(
+      async () => {
+        await initHandler({ params: {} }, {});
+      },
+      (err) => err instanceof McpError && err.code === ErrorCode.InvalidRequest
+    );
+  });
+
+  void it('rejects initialize when protocolVersion is not a string', async () => {
+    const { handlers, server } = createServerStub();
+    handlers.set('initialize', async () => 'ok');
+
+    installInitializationGuards(server);
+
+    const initHandler = getHandler(handlers, 'initialize');
+    await assert.rejects(
+      async () => {
+        await initHandler({ params: { protocolVersion: 123 } }, {});
+      },
+      (err) => err instanceof McpError && err.code === ErrorCode.InvalidRequest
+    );
+  });
+
+  void it('rejects protocolVersion 2025-03-26 (batching unsupported)', async () => {
+    const { handlers, server } = createServerStub();
+    handlers.set('initialize', async () => 'ok');
+
+    installInitializationGuards(server);
+
+    const initHandler = getHandler(handlers, 'initialize');
+    await assert.rejects(
+      async () => {
+        await initHandler({ params: { protocolVersion: '2025-03-26' } }, {});
       },
       (err) => err instanceof McpError && err.code === ErrorCode.InvalidRequest
     );

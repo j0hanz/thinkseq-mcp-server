@@ -1,12 +1,14 @@
-import {
-  ErrorCode,
-  McpError,
-  SUPPORTED_PROTOCOL_VERSIONS,
-} from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 type RequestHandler = (request: unknown, extra: unknown) => unknown;
 
 const INIT_FIRST_ERROR_MESSAGE = 'initialize must be the first request';
+
+const SERVER_SUPPORTED_PROTOCOL_VERSIONS = new Set<string>([
+  // Keep in sync with stdio transport capabilities (no JSON-RPC batching).
+  '2025-06-18',
+  '2025-11-25',
+]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -24,8 +26,13 @@ function getInitializeProtocolVersion(request: unknown): unknown {
 }
 
 function assertSupportedProtocolVersion(protocolVersion: unknown): void {
-  if (typeof protocolVersion !== 'string') return;
-  if (SUPPORTED_PROTOCOL_VERSIONS.includes(protocolVersion)) return;
+  if (typeof protocolVersion !== 'string') {
+    throw new McpError(
+      ErrorCode.InvalidRequest,
+      'protocolVersion must be a string'
+    );
+  }
+  if (SERVER_SUPPORTED_PROTOCOL_VERSIONS.has(protocolVersion)) return;
   throw new McpError(
     ErrorCode.InvalidRequest,
     `Unsupported protocolVersion: ${protocolVersion}`

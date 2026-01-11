@@ -16,7 +16,7 @@ const fatal = (err: unknown): never => {
 };
 
 const printHelpAndExit = (): never => {
-  console.log(getCliHelpText());
+  console.error(getCliHelpText());
   process.exit(0);
 };
 

@@ -155,6 +155,23 @@ void describe('ThinkingEngine.pruning', () => {
     assert.ok(result.result.thoughtHistoryLength <= 5);
   });
 
+  void it('should keep monotonic thoughtNumber even when pruning', () => {
+    const engine = new ThinkingEngine({ maxThoughts: 5 });
+    const numbers: number[] = [];
+
+    for (let i = 1; i <= 8; i += 1) {
+      const result = engine.processThought({
+        thought: `t${i}`,
+        totalThoughts: 10,
+      });
+      assert.ok(result.ok);
+      numbers.push(result.result.thoughtNumber);
+      assert.strictEqual(result.result.thoughtNumber, i);
+    }
+
+    assert.deepStrictEqual(numbers, [1, 2, 3, 4, 5, 6, 7, 8]);
+  });
+
   void it('should prune when memory cap exceeded', () => {
     const engine = new ThinkingEngine({
       maxThoughts: 1000,

@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 export interface PackageInfo {
   name?: string;
@@ -18,6 +19,10 @@ export interface PackageJsonDependencies {
 
 const defaultReadFile: ReadFile = (path, options) => readFile(path, options);
 const defaultCwd = (): string => process.cwd();
+
+const defaultPackageJsonPath = fileURLToPath(
+  new URL('../../package.json', import.meta.url)
+);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -59,6 +64,13 @@ function resolveCwd(deps?: PackageJsonDependencies): () => string {
   return deps?.cwd ?? defaultCwd;
 }
 
+function resolvePackageJsonPath(deps?: PackageJsonDependencies): string {
+  // Only honor cwd injection when readFile is also injected (test seam).
+  if (deps?.readFile && deps.cwd)
+    return join(resolveCwd(deps)(), 'package.json');
+  return defaultPackageJsonPath;
+}
+
 function buildReadOptions(signal?: AbortSignal): {
   encoding: 'utf8';
   signal?: AbortSignal;
@@ -72,9 +84,8 @@ export async function readSelfPackageJson(
 ): Promise<PackageInfo> {
   try {
     const readFileImpl = resolveReadFile(deps);
-    const cwd = resolveCwd(deps);
     const raw = await readFileImpl(
-      join(cwd(), 'package.json'),
+      resolvePackageJsonPath(deps),
       buildReadOptions(signal)
     );
     return parsePackageJson(raw);
