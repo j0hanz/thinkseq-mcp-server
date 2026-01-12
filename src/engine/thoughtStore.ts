@@ -47,8 +47,29 @@ export class ThoughtStore {
     this.#estimatedBytes += this.#estimateThoughtBytes(stored);
   }
 
+  #findActiveThoughtIndex(thoughtNumber: number): number {
+    const activeThoughtNumbers = this.#activeThoughtNumbers;
+    let low = 0;
+    let high = activeThoughtNumbers.length;
+    while (low < high) {
+      const mid = Math.floor((low + high) / 2);
+      const midValue = activeThoughtNumbers[mid];
+      if (midValue === undefined) {
+        return -1;
+      }
+      if (midValue < thoughtNumber) {
+        low = mid + 1;
+      } else {
+        high = mid;
+      }
+    }
+    const foundValue = activeThoughtNumbers[low];
+    if (foundValue === thoughtNumber) return low;
+    return -1;
+  }
+
   supersedeFrom(targetNumber: number, supersededBy: number): number[] {
-    const startIndex = this.#activeThoughtNumbers.indexOf(targetNumber);
+    const startIndex = this.#findActiveThoughtIndex(targetNumber);
     if (startIndex < 0) return [];
     const supersedes: number[] = [];
     for (let i = startIndex; i < this.#activeThoughts.length; i += 1) {

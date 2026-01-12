@@ -8,6 +8,10 @@ export interface ErrorResponse extends Record<string, unknown> {
   isError: true;
 }
 
+export interface CreateErrorResponseOptions {
+  includeTextContent?: boolean;
+}
+
 export function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   if (typeof error === 'string' && error.length > 0) return error;
@@ -17,15 +21,19 @@ export function getErrorMessage(error: unknown): string {
 export function createErrorResponse(
   code: string,
   message: string,
-  result?: unknown
+  result?: unknown,
+  options: CreateErrorResponseOptions = {}
 ): ErrorResponse {
   const structured: ErrorResponse['structuredContent'] = {
     ok: false,
     error: { code, message },
     ...(result !== undefined && { result }),
   };
+  const includeTextContent = options.includeTextContent ?? true;
   const response: ErrorResponse = {
-    content: [{ type: 'text', text: JSON.stringify(structured) }],
+    content: includeTextContent
+      ? [{ type: 'text', text: JSON.stringify(structured) }]
+      : [],
     structuredContent: structured,
     isError: true,
   };

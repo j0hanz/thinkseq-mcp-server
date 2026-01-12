@@ -13,6 +13,20 @@ import type { ProcessResult, ThoughtData } from '../lib/types.js';
 import { ThinkSeqInputSchema } from '../schemas/inputs.js';
 import { ThinkSeqOutputSchema } from '../schemas/outputs.js';
 
+function resolveIncludeTextContent(): boolean {
+  const raw = process.env.THINKSEQ_INCLUDE_TEXT_CONTENT;
+  if (raw === undefined) return true;
+  switch (raw.trim().toLowerCase()) {
+    case '0':
+    case 'false':
+    case 'no':
+    case 'off':
+      return false;
+    default:
+      return true;
+  }
+}
+
 const THINKSEQ_TOOL_DEFINITION = {
   title: 'Think Sequentially',
   description: `Record a concise thinking step (max 2000 chars). Be brief: capture only the essential insight, calculation, or decision.
@@ -79,9 +93,19 @@ function publishToolFailure(errorMessage: string, durationMs: number): void {
   });
 }
 
-function buildSuccessResponse(result: ProcessResult): ToolResponse {
+function buildSuccessResponse(
+  result: ProcessResult,
+  options: { includeTextContent: boolean }
+): ToolResponse {
   if (!result.ok) {
-    return createErrorResponse(result.error.code, result.error.message);
+    return createErrorResponse(
+      result.error.code,
+      result.error.message,
+      undefined,
+      {
+        includeTextContent: options.includeTextContent,
+      }
+    );
   }
   const structured: ThinkSeqOutput = {
     ok: true,
@@ -94,7 +118,9 @@ function buildSuccessResponse(result: ProcessResult): ToolResponse {
     },
   };
   return {
-    content: [{ type: 'text', text: JSON.stringify(structured) }],
+    content: options.includeTextContent
+      ? [{ type: 'text', text: JSON.stringify(structured) }]
+      : [],
     structuredContent: structured,
   };
 }
@@ -108,6 +134,7 @@ async function handleThinkSeq(
   input: ThinkSeqInput
 ): Promise<ToolResponse> {
   return runWithContext(async () => {
+    const includeTextContent = resolveIncludeTextContent();
     const normalized: ThoughtData = {
       thought: input.thought,
       totalThoughts: input.totalThoughts,
@@ -121,12 +148,14 @@ async function handleThinkSeq(
       const result = await engine.processThought(normalized);
       const durationMs = getDurationMs(start);
       publishToolSuccess(durationMs);
-      return buildSuccessResponse(result);
+      return buildSuccessResponse(result, { includeTextContent });
     } catch (err) {
       const errorMessage = getErrorMessage(err);
       const durationMs = getDurationMs(start);
       publishToolFailure(errorMessage, durationMs);
-      return createErrorResponse('E_THINK', errorMessage);
+      return createErrorResponse('E_THINK', errorMessage, undefined, {
+        includeTextContent,
+      });
     }
   });
 }

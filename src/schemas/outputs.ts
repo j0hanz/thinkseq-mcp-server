@@ -36,33 +36,13 @@ const ThinkSeqErrorSchema = z.object({
   message: z.string(),
 });
 
-export const ThinkSeqOutputSchema = z
-  .object({
-    ok: z.boolean(),
-    result: ThinkSeqResultSchema.optional(),
-    error: ThinkSeqErrorSchema.optional(),
-  })
-  .superRefine((value, ctx) => {
-    if (value.ok) {
-      if (!value.result) {
-        ctx.addIssue({
-          code: 'custom',
-          path: ['result'],
-          message: 'result is required when ok is true',
-        });
-      }
-      if (value.error) {
-        ctx.addIssue({
-          code: 'custom',
-          path: ['error'],
-          message: 'error must be undefined when ok is true',
-        });
-      }
-    } else if (!value.error) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['error'],
-        message: 'error is required when ok is false',
-      });
-    }
-  });
+export const ThinkSeqOutputSchema = z.discriminatedUnion('ok', [
+  z.strictObject({
+    ok: z.literal(true),
+    result: ThinkSeqResultSchema,
+  }),
+  z.strictObject({
+    ok: z.literal(false),
+    error: ThinkSeqErrorSchema,
+  }),
+]);

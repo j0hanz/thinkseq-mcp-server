@@ -92,6 +92,25 @@ void describe('tools.registerThinkSeq handler success', () => {
       JSON.stringify(response.structuredContent)
     );
   });
+
+  void it('can omit text content when THINKSEQ_INCLUDE_TEXT_CONTENT=0', async (t) => {
+    const previous = process.env.THINKSEQ_INCLUDE_TEXT_CONTENT;
+    process.env.THINKSEQ_INCLUDE_TEXT_CONTENT = '0';
+    t.after(() => {
+      if (previous === undefined) {
+        // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+        delete process.env.THINKSEQ_INCLUDE_TEXT_CONTENT;
+      } else {
+        process.env.THINKSEQ_INCLUDE_TEXT_CONTENT = previous;
+      }
+    });
+
+    const handler = registerThinkSeqForTests(createOkEngine());
+    const response = await handler(createThoughtInput());
+
+    assert.equal(response.structuredContent.ok, true);
+    assert.deepEqual(response.content, []);
+  });
 });
 
 void describe('tools.registerThinkSeq diagnostics durationMs (success)', () => {
