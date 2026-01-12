@@ -27,6 +27,8 @@ export class ThinkingEngine {
   #store: ThoughtStore;
   #hasRevisions = false;
 
+  static readonly DEFAULT_TOTAL_THOUGHTS = 3;
+
   constructor(options: ThinkingEngineOptions = {}) {
     const maxThoughts = normalizeInt(
       options.maxThoughts,
@@ -59,7 +61,8 @@ export class ThinkingEngine {
   }
 
   #processNewThought(input: ThoughtData): ProcessResult {
-    const numbers = this.#store.nextThoughtNumbers(input.totalThoughts);
+    const effectiveTotalThoughts = this.#resolveEffectiveTotalThoughts(input);
+    const numbers = this.#store.nextThoughtNumbers(effectiveTotalThoughts);
     const stored = this.#buildStoredThought(input, numbers);
     this.#store.storeThought(stored);
     this.#store.pruneHistoryIfNeeded();
@@ -73,7 +76,8 @@ export class ThinkingEngine {
     if (!resolved.ok) return resolved.error;
     const { targetNumber } = resolved;
 
-    const numbers = this.#store.nextThoughtNumbers(input.totalThoughts);
+    const effectiveTotalThoughts = this.#resolveEffectiveTotalThoughts(input);
+    const numbers = this.#store.nextThoughtNumbers(effectiveTotalThoughts);
     const supersedesAll = this.#store.supersedeFrom(
       targetNumber,
       numbers.thoughtNumber
@@ -106,7 +110,10 @@ export class ThinkingEngine {
     }
   ): StoredThought {
     return {
-      ...input,
+      thought: input.thought,
+      ...(input.revisesThought !== undefined && {
+        revisesThought: input.revisesThought,
+      }),
       thoughtNumber: details.thoughtNumber,
       totalThoughts: details.totalThoughts,
       timestamp: Date.now(),
@@ -115,6 +122,23 @@ export class ThinkingEngine {
         revisionOf: details.revisionOf,
       }),
     };
+  }
+
+  #resolveEffectiveTotalThoughts(input: ThoughtData): number {
+    if (input.totalThoughts !== undefined) {
+      return input.totalThoughts;
+    }
+
+    const activeThoughts = this.#store.getActiveThoughts();
+    const lastActive = activeThoughts[activeThoughts.length - 1];
+    if (
+      lastActive !== undefined &&
+      lastActive.totalThoughts > ThinkingEngine.DEFAULT_TOTAL_THOUGHTS
+    ) {
+      return lastActive.totalThoughts;
+    }
+
+    return ThinkingEngine.DEFAULT_TOTAL_THOUGHTS;
   }
 
   #buildProcessResult(

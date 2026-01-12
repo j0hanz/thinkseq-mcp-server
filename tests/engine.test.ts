@@ -55,6 +55,25 @@ void describe('ThinkingEngine.progress', () => {
     assert.strictEqual(result4.result.thoughtNumber, 4);
     assert.strictEqual(result4.result.progress, 1);
   });
+
+  void it('should inherit totalThoughts when omitted to avoid progress jumps', () => {
+    const engine = new ThinkingEngine();
+
+    const r1 = engine.processThought({
+      thought: 'Step 1',
+      totalThoughts: 10,
+    });
+    assert.ok(r1.ok);
+    assert.strictEqual(r1.result.totalThoughts, 10);
+    assert.strictEqual(r1.result.progress, 0.1);
+
+    const r2 = engine.processThought({
+      thought: 'Step 2',
+    });
+    assert.ok(r2.ok);
+    assert.strictEqual(r2.result.totalThoughts, 10);
+    assert.strictEqual(r2.result.progress, 0.2);
+  });
 });
 
 void describe('ThinkingEngine.characterization', () => {
@@ -78,7 +97,7 @@ void describe('ThinkingEngine.characterization', () => {
       revisableThoughts: [1],
       revisableThoughtsTotal: 1,
       context: {
-        recentThoughts: [{ number: 1, preview: 'First' }],
+        recentThoughts: [{ stepIndex: 1, number: 1, preview: 'First' }],
       },
     });
   });
@@ -234,7 +253,7 @@ void describe('ThinkingEngine.revision', () => {
       revisableThoughts: [3],
       revisableThoughtsTotal: 1,
       context: {
-        recentThoughts: [{ number: 3, preview: 'A revised' }],
+        recentThoughts: [{ stepIndex: 1, number: 3, preview: 'A revised' }],
         revisionInfo: { revises: 1, supersedes: [1, 2], supersedesTotal: 2 },
       },
     });

@@ -21,6 +21,11 @@ const ThinkSeqResultSchema = z.object({
     recentThoughts: z
       .array(
         z.object({
+          stepIndex: z
+            .number()
+            .int()
+            .min(1)
+            .describe('1-based index in the current active chain'),
           number: z.number(),
           preview: z.string(),
         })

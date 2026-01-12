@@ -132,7 +132,7 @@ Record a concise thinking step. Be brief: capture only the essential insight, ca
 
 | Field            | Type   | Required | Description                                                        |
 | :--------------- | :----- | :------: | :----------------------------------------------------------------- |
-| `thought`        | string |   yes    | Current thinking step (1-2000 chars).                              |
+| `thought`        | string |   yes    | Current thinking step (1-5000 chars).                              |
 | `totalThoughts`  | number |    no    | Estimated total thoughts (1-25, default: 3).                       |
 | `revisesThought` | number |    no    | Revise a previous thought by number. Original preserved for audit. |
 
@@ -164,15 +164,16 @@ Result fields:
 
 Context fields:
 
-| Field            | Type   | Description                                                            |
-| :--------------- | :----- | :--------------------------------------------------------------------- |
-| `recentThoughts` | array  | Up to the last 5 active thoughts with `number` and `preview`.          |
-| `revisionInfo`   | object | Present when revising: `revises` (number) and `supersedes` (number[]). |
+| Field            | Type   | Description                                                             |
+| :--------------- | :----- | :---------------------------------------------------------------------- |
+| `recentThoughts` | array  | Up to the last 5 active thoughts with `stepIndex`, `number`, `preview`. |
+| `revisionInfo`   | object | Present when revising: `revises` (number) and `supersedes` (number[]).  |
 
 Notes:
 
 - `recentThoughts` previews are truncated to 100 characters.
-- Revisions supersede the target thought and any later active thoughts.
+- Revisions are a destructive rewind: they supersede the target thought and any later active thoughts in the active chain.
+- `recentThoughts[].stepIndex` is a contiguous 1-based index in the current active chain (useful when thought numbers become non-contiguous after revisions).
 
 Error fields:
 
@@ -211,6 +212,7 @@ Output (success):
     "context": {
       "recentThoughts": [
         {
+          "stepIndex": 1,
           "number": 1,
           "preview": "3 steps: parse -> validate -> transform"
         }
@@ -250,6 +252,7 @@ Output:
     "context": {
       "recentThoughts": [
         {
+          "stepIndex": 1,
           "number": 2,
           "preview": "Better approach: validate first, then parse"
         }

@@ -17,7 +17,9 @@ export function buildContextSummary(
   revisionInfo?: RevisionInfo
 ): ContextSummary {
   const recent = getRecentActiveThoughts(activeThoughts, 5);
-  const recentThoughts = recent.map((thought) => ({
+  const startIndex = activeThoughts.length - recent.length;
+  const recentThoughts = recent.map((thought, index) => ({
+    stepIndex: startIndex + index + 1,
     number: thought.thoughtNumber,
     preview:
       thought.thought.slice(0, 100) +

@@ -1,10 +1,13 @@
 export interface ThoughtData {
   thought: string;
-  totalThoughts: number;
+  totalThoughts?: number;
   revisesThought?: number;
 }
 
-export interface StoredThought extends ThoughtData {
+export interface StoredThought {
+  thought: string;
+  totalThoughts: number;
+  revisesThought?: number;
   thoughtNumber: number;
   timestamp: number;
   revisionOf?: number;
@@ -20,6 +23,7 @@ export interface RevisionInfo {
 
 export interface ContextSummary {
   recentThoughts: readonly {
+    stepIndex: number;
     number: number;
     preview: string;
   }[];

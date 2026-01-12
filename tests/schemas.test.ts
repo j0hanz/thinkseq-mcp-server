@@ -43,7 +43,7 @@ void describe('ThinkSeqInputSchema', () => {
     const result = ThinkSeqInputSchema.safeParse(input);
     assert.equal(result.success, true);
     if (result.success) {
-      assert.equal(result.data.totalThoughts, 3);
+      assert.equal(result.data.totalThoughts, undefined);
     }
   });
 
