@@ -243,6 +243,7 @@ function assertToolMessagesHaveContext(messages: unknown[]): void {
 
   assert.equal(startContext.requestId, endContext.requestId);
   assert.equal(startContext.startedAt, endContext.startedAt);
+  assert.equal(startContext.startedAtEpochMs, endContext.startedAtEpochMs);
 }
 
 function getContextRecord(
@@ -254,5 +255,7 @@ function getContextRecord(
   assert.ok(context.requestId.length > 0);
   assert.equal(typeof context.startedAt, 'number');
   assert.ok(Number.isFinite(context.startedAt));
+  assert.equal(typeof context.startedAtEpochMs, 'number');
+  assert.ok(Number.isFinite(context.startedAtEpochMs));
   return context;
 }

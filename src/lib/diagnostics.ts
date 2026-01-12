@@ -5,6 +5,7 @@ import { getRequestContext } from './context.js';
 interface EventContext {
   requestId: string;
   startedAt: number;
+  startedAtEpochMs: number;
 }
 
 type ToolEventBase =
@@ -60,6 +61,7 @@ function attachContext<T extends { context?: EventContext }>(event: T): T {
       ...event.context,
       requestId: context.requestId,
       startedAt: context.startedAt,
+      startedAtEpochMs: context.startedAtEpochMs,
     },
   };
 }
