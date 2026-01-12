@@ -190,6 +190,7 @@ function buildSuccessResult(
       hasRevisions: false,
       activePathLength: 1,
       revisableThoughts: [1],
+      revisableThoughtsTotal: 1,
       context: { recentThoughts: [] },
       ...overrides,
     },

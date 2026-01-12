@@ -35,7 +35,7 @@ REVISION: If you realize an earlier step was wrong or want to try a different ap
 
 Example: { "thought": "Better approach: use caching", "revisesThought": 3 }
 
-Returns: thoughtNumber, progress (0-1), isComplete, revisableThoughts, and recent thought previews.`,
+Returns: thoughtNumber, progress (0-1), isComplete, revisableThoughts (+revisableThoughtsTotal), and recent thought previews.`,
   inputSchema: ThinkSeqInputSchema,
   outputSchema: ThinkSeqOutputSchema,
 };

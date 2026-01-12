@@ -15,6 +15,7 @@ export interface StoredThought extends ThoughtData {
 export interface RevisionInfo {
   revises: number;
   supersedes: number[];
+  supersedesTotal: number;
 }
 
 export interface ContextSummary {
@@ -37,6 +38,7 @@ export type ProcessResult =
         hasRevisions: boolean;
         activePathLength: number;
         revisableThoughts: number[];
+        revisableThoughtsTotal: number;
         context: ContextSummary;
       };
       error?: never;

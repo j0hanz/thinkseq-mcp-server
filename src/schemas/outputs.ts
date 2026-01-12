@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { MAX_REVISABLE_THOUGHTS, MAX_SUPERSEDES } from '../engineConfig.js';
+
 const ThinkSeqResultSchema = z.object({
   thoughtNumber: z.number(),
   totalThoughts: z.number(),
@@ -12,7 +14,9 @@ const ThinkSeqResultSchema = z.object({
     .describe('Count of non-superseded thoughts in active chain'),
   revisableThoughts: z
     .array(z.number())
+    .max(MAX_REVISABLE_THOUGHTS)
     .describe('Thought numbers available for revision'),
+  revisableThoughtsTotal: z.number(),
   context: z.object({
     recentThoughts: z
       .array(
@@ -25,7 +29,8 @@ const ThinkSeqResultSchema = z.object({
     revisionInfo: z
       .object({
         revises: z.number(),
-        supersedes: z.array(z.number()),
+        supersedes: z.array(z.number()).max(MAX_SUPERSEDES),
+        supersedesTotal: z.number(),
       })
       .optional(),
   }),
@@ -44,5 +49,6 @@ export const ThinkSeqOutputSchema = z.discriminatedUnion('ok', [
   z.strictObject({
     ok: z.literal(false),
     error: ThinkSeqErrorSchema,
+    result: z.unknown().optional(),
   }),
 ]);

@@ -5,6 +5,8 @@ import {
   DEFAULT_MAX_THOUGHTS,
   ESTIMATED_THOUGHT_OVERHEAD_BYTES,
   MAX_MEMORY_BYTES,
+  MAX_REVISABLE_THOUGHTS,
+  MAX_SUPERSEDES,
   MAX_THOUGHTS_CAP,
   normalizeInt,
 } from './engineConfig.js';
@@ -72,10 +74,12 @@ export class ThinkingEngine {
     const { targetNumber } = resolved;
 
     const numbers = this.#store.nextThoughtNumbers(input.totalThoughts);
-    const supersedes = this.#store.supersedeFrom(
+    const supersedesAll = this.#store.supersedeFrom(
       targetNumber,
       numbers.thoughtNumber
     );
+    const supersedesTotal = supersedesAll.length;
+    const supersedes = capArrayStart(supersedesAll, MAX_SUPERSEDES);
 
     const stored = this.#buildStoredThought(input, {
       ...numbers,
@@ -89,6 +93,7 @@ export class ThinkingEngine {
     return this.#buildProcessResult(stored, {
       revises: targetNumber,
       supersedes,
+      supersedesTotal,
     });
   }
 
@@ -119,7 +124,12 @@ export class ThinkingEngine {
     const activeThoughts = this.#store.getActiveThoughts();
     const context = buildContextSummary(activeThoughts, revisionInfo);
     const isComplete = stored.thoughtNumber >= stored.totalThoughts;
-    const revisableThoughts = this.#store.getActiveThoughtNumbers().slice();
+    const revisableThoughtsAll = this.#store.getActiveThoughtNumbers();
+    const revisableThoughtsTotal = revisableThoughtsAll.length;
+    const revisableThoughts = capArrayEnd(
+      revisableThoughtsAll,
+      MAX_REVISABLE_THOUGHTS
+    );
 
     return {
       ok: true,
@@ -132,8 +142,19 @@ export class ThinkingEngine {
         hasRevisions: this.#hasRevisions,
         activePathLength: activeThoughts.length,
         revisableThoughts,
+        revisableThoughtsTotal,
         context,
       },
     };
   }
+}
+
+function capArrayStart(values: readonly number[], max: number): number[] {
+  if (values.length <= max) return values.slice();
+  return values.slice(0, max);
+}
+
+function capArrayEnd(values: readonly number[], max: number): number[] {
+  if (values.length <= max) return values.slice();
+  return values.slice(-max);
 }

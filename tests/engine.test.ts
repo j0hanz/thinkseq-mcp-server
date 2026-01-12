@@ -76,6 +76,7 @@ void describe('ThinkingEngine.characterization', () => {
       hasRevisions: false,
       activePathLength: 1,
       revisableThoughts: [1],
+      revisableThoughtsTotal: 1,
       context: {
         recentThoughts: [{ number: 1, preview: 'First' }],
       },
@@ -207,6 +208,7 @@ void describe('ThinkingEngine.revision', () => {
     assert.ok(r3.result.context.revisionInfo);
     assert.strictEqual(r3.result.context.revisionInfo.revises, 1);
     assert.deepStrictEqual(r3.result.context.revisionInfo.supersedes, [1, 2]);
+    assert.strictEqual(r3.result.context.revisionInfo.supersedesTotal, 2);
   });
 
   void it('should preserve revision output shape (characterization)', () => {
@@ -230,9 +232,10 @@ void describe('ThinkingEngine.revision', () => {
       hasRevisions: true,
       activePathLength: 1,
       revisableThoughts: [3],
+      revisableThoughtsTotal: 1,
       context: {
         recentThoughts: [{ number: 3, preview: 'A revised' }],
-        revisionInfo: { revises: 1, supersedes: [1, 2] },
+        revisionInfo: { revises: 1, supersedes: [1, 2], supersedesTotal: 2 },
       },
     });
   });
