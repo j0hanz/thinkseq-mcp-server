@@ -265,7 +265,7 @@ Output:
 
 ## Behavior and validation
 
-- Inputs are validated with Zod and unknown keys are rejected.
+- Inputs are validated with Zod and unknown keys are stripped (ignored).
 - `thoughtNumber` is auto-incremented (1, 2, 3...).
 - `totalThoughts` defaults to 3, must be in 1-25, and is adjusted up to at least `thoughtNumber`.
 - The engine stores thoughts in memory and prunes when limits are exceeded:
