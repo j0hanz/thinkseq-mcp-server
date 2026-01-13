@@ -9,6 +9,7 @@ import type { LifecycleEvent } from '../lib/diagnostics.js';
 import type { PackageInfo } from '../lib/package.js';
 import { readSelfPackageJson } from '../lib/package.js';
 import {
+  installStdioInitializationGuards,
   installStdioInvalidMessageGuards,
   installStdioParseErrorResponder,
 } from '../lib/stdioGuards.js';
@@ -89,6 +90,7 @@ const defaultConnectServer = async (
 ): Promise<TransportLike> => {
   const transport = createTransport();
   await server.connect(transport);
+  installStdioInitializationGuards(transport);
   installStdioInvalidMessageGuards(transport);
   installStdioParseErrorResponder(transport);
   return transport;

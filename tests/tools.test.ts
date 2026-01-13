@@ -146,6 +146,22 @@ void describe('tools.registerThinkSeq diagnostics durationMs (error)', () => {
   });
 });
 
+void describe('tools.registerThinkSeq diagnostics durationMs (engine error)', () => {
+  void it('publishes engine error code and message', async (t) => {
+    const { messages } = captureDiagnostics(t, 'thinkseq:tool');
+
+    const handler = registerThinkSeqForTests(createFailingEngine());
+    await handler(createThoughtInput());
+
+    assert.equal(messages.length, 2);
+    const end = getMessageRecord(messages[1]);
+    assert.equal(end.type, 'tool.end');
+    assert.equal(end.ok, false);
+    assert.equal(end.errorCode, 'E_TEST');
+    assert.equal(end.errorMessage, 'bad input');
+  });
+});
+
 void describe('tools.registerThinkSeq handler error', () => {
   void it('returns an error response on failure', async () => {
     const server = new FakeServer();
@@ -230,6 +246,15 @@ function createThrowingEngine(): Pick<ThinkingEngine, 'processThought'> {
     processThought: (): ProcessResult => {
       throw new Error('boom');
     },
+  };
+}
+
+function createFailingEngine(): Pick<ThinkingEngine, 'processThought'> {
+  return {
+    processThought: (): ProcessResult => ({
+      ok: false,
+      error: { code: 'E_TEST', message: 'bad input' },
+    }),
   };
 }
 

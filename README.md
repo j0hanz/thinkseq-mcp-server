@@ -268,7 +268,7 @@ Output:
 
 ## Behavior and validation
 
-- Inputs are validated with Zod and unknown keys are stripped (ignored).
+- Inputs are validated with Zod and unknown keys are rejected.
 - `thoughtNumber` is auto-incremented (1, 2, 3...).
 - `totalThoughts` defaults to 3, must be in 1-25, and is adjusted up to at least `thoughtNumber`.
 - The engine stores thoughts in memory and prunes when limits are exceeded:
@@ -282,7 +282,6 @@ This server publishes events via `node:diagnostics_channel`:
 
 - `thinkseq:tool` for `tool.start` and `tool.end` (includes duration, errors, and request context).
 - `thinkseq:lifecycle` for `lifecycle.started` and `lifecycle.shutdown`.
-- `thinkseq:engine` for internal engine events such as `engine.sequence_gap`.
 
 ## Configuration
 

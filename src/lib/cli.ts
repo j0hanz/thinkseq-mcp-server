@@ -61,8 +61,11 @@ function parsePositiveInt(
   label: string
 ): number | undefined {
   if (value === undefined) return undefined;
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
+  if (!/^\d+$/.test(value)) {
+    throw new Error(`Invalid ${label}: ${value}`);
+  }
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed <= 0) {
     throw new Error(`Invalid ${label}: ${value}`);
   }
   return parsed;

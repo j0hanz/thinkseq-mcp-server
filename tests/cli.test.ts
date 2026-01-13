@@ -37,6 +37,11 @@ void describe('cli.parseCliConfig', () => {
     assert.throws(() => parseCliConfig(['--max-memory-mb', 'abc']));
   });
 
+  void it('rejects non-integer numeric values', () => {
+    assert.throws(() => parseCliConfig(['--max-thoughts', '1.5']));
+    assert.throws(() => parseCliConfig(['--max-memory-mb', '10foo']));
+  });
+
   void it('returns help text', () => {
     assert.match(getCliHelpText(), /Usage: thinkseq/);
   });

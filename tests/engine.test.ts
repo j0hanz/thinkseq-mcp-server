@@ -74,6 +74,25 @@ void describe('ThinkingEngine.progress', () => {
     assert.strictEqual(r2.result.totalThoughts, 10);
     assert.strictEqual(r2.result.progress, 0.2);
   });
+
+  void it('should inherit totalThoughts even when below default', () => {
+    const engine = new ThinkingEngine();
+
+    const r1 = engine.processThought({
+      thought: 'Step 1',
+      totalThoughts: 2,
+    });
+    assert.ok(r1.ok);
+    assert.strictEqual(r1.result.totalThoughts, 2);
+    assert.strictEqual(r1.result.progress, 0.5);
+
+    const r2 = engine.processThought({
+      thought: 'Step 2',
+    });
+    assert.ok(r2.ok);
+    assert.strictEqual(r2.result.totalThoughts, 2);
+    assert.strictEqual(r2.result.progress, 1);
+  });
 });
 
 void describe('ThinkingEngine.characterization', () => {

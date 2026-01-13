@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import {
+  installStdioInitializationGuards,
   installStdioInvalidMessageGuards,
   installStdioParseErrorResponder,
 } from '../src/lib/stdioGuards.js';
@@ -27,6 +28,114 @@ const createTransport = () => {
     },
   };
 };
+
+void describe('stdioGuards.installStdioInitializationGuards', () => {
+  void it('rejects requests before initialize', async () => {
+    const transport = createTransport();
+
+    installStdioInitializationGuards(transport);
+    assert.ok(transport.onmessage);
+
+    transport.onmessage({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'tools/list',
+    });
+
+    await Promise.resolve();
+
+    assert.equal(transport.sent.length, 1);
+    assert.equal(transport.seen.length, 0);
+  });
+
+  void it('blocks notifications before initialize', async () => {
+    const transport = createTransport();
+
+    installStdioInitializationGuards(transport);
+    assert.ok(transport.onmessage);
+
+    transport.onmessage({
+      jsonrpc: '2.0',
+      method: 'tools/list',
+    });
+
+    await Promise.resolve();
+
+    assert.equal(transport.sent.length, 0);
+    assert.equal(transport.seen.length, 0);
+  });
+
+  void it('rejects initialize when protocolVersion is missing', async () => {
+    const transport = createTransport();
+
+    installStdioInitializationGuards(transport);
+    assert.ok(transport.onmessage);
+
+    transport.onmessage({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'initialize',
+      params: {},
+    });
+
+    await Promise.resolve();
+
+    assert.equal(transport.sent.length, 1);
+    assert.equal(transport.seen.length, 0);
+  });
+
+  void it('rejects initialize when protocolVersion is unsupported', async () => {
+    const transport = createTransport();
+
+    installStdioInitializationGuards(transport);
+    assert.ok(transport.onmessage);
+
+    transport.onmessage({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'initialize',
+      params: { protocolVersion: '2025-03-26' },
+    });
+
+    await Promise.resolve();
+
+    assert.equal(transport.sent.length, 1);
+    assert.equal(transport.seen.length, 0);
+  });
+
+  void it('allows requests after a successful initialize response', async () => {
+    const transport = createTransport();
+
+    installStdioInitializationGuards(transport);
+    assert.ok(transport.onmessage);
+
+    transport.onmessage({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'initialize',
+      params: { protocolVersion: '2025-11-25' },
+    });
+
+    transport.onmessage({
+      jsonrpc: '2.0',
+      id: 2,
+      method: 'tools/list',
+    });
+
+    await transport.send({ jsonrpc: '2.0', id: 1, result: {} });
+
+    transport.onmessage({
+      jsonrpc: '2.0',
+      id: 3,
+      method: 'tools/list',
+    });
+
+    await Promise.resolve();
+
+    assert.equal(transport.sent.length, 2);
+    assert.equal(transport.seen.length, 2);
+  });
+});
 
 void describe('stdioGuards.installStdioInvalidMessageGuards', () => {
   void it('sends invalid request for malformed messages', async () => {

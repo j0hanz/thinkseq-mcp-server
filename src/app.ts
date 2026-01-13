@@ -5,7 +5,6 @@ import {
   resolveRunDependencies,
   type RunDependencies,
 } from './appConfig.js';
-import { installInitializationGuards } from './lib/protocolGuards.js';
 
 interface ProcessErrorHandlerDeps {
   processLike?: ProcessLike;
@@ -59,7 +58,6 @@ export async function run(deps: RunDependencies = {}): Promise<void> {
   const server = resolved.createServer(name, version);
   const engine = resolved.engineFactory();
   resolved.registerTool(server, engine);
-  installInitializationGuards(server);
 
   const transport = await resolved.connectServer(server);
   resolved.installShutdownHandlers(

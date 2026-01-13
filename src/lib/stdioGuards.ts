@@ -6,6 +6,16 @@ interface StdioMessageTransportLike {
   onerror?: (error: unknown) => void;
 }
 
+type JsonRpcId = number | string | null;
+
+const INIT_FIRST_ERROR_MESSAGE = 'initialize must be the first request';
+
+const SERVER_SUPPORTED_PROTOCOL_VERSIONS = new Set<string>([
+  // Keep in sync with stdio transport capabilities (no JSON-RPC batching).
+  '2025-06-18',
+  '2025-11-25',
+]);
+
 function isStdioMessageTransport(
   value: unknown
 ): value is StdioMessageTransportLike {
@@ -17,14 +27,62 @@ function isStdioMessageTransport(
   );
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isValidJsonRpcId(value: unknown): value is JsonRpcId {
+  return (
+    value === null || typeof value === 'string' || typeof value === 'number'
+  );
+}
+
+type JsonRpcMethodMessage =
+  | { method: string; params?: unknown; hasId: false }
+  | { method: string; params?: unknown; hasId: true; id: JsonRpcId };
+
+function parseJsonRpcMethodMessage(
+  message: unknown
+): JsonRpcMethodMessage | undefined {
+  if (!isRecord(message)) return undefined;
+  const { method } = message;
+  if (typeof method !== 'string') return undefined;
+  const { params } = message;
+  if (!('id' in message)) {
+    return { method, params, hasId: false };
+  }
+  const { id } = message;
+  if (!isValidJsonRpcId(id)) return undefined;
+  return { method, id, params, hasId: true };
+}
+
+function parseJsonRpcResponse(
+  message: unknown
+): { id: JsonRpcId; error?: unknown } | undefined {
+  if (!isRecord(message)) return undefined;
+  if (!('id' in message)) return undefined;
+  const { id } = message;
+  if (!isValidJsonRpcId(id)) return undefined;
+  const hasResult = 'result' in message;
+  const hasError = 'error' in message;
+  if (!hasResult && !hasError) return undefined;
+  const { error } = message;
+  return { id, error: hasError ? error : undefined };
+}
+
+function getIdKey(id: JsonRpcId): string {
+  return id === null ? 'null' : String(id);
+}
+
 function sendError(
   transport: StdioMessageTransportLike,
   code: number,
-  message: string
+  message: string,
+  id: JsonRpcId = null
 ): void {
   const sendPromise = transport.send?.({
     jsonrpc: '2.0',
-    id: null,
+    id,
     error: {
       code,
       message,
@@ -47,6 +105,96 @@ function isParseError(error: unknown): boolean {
 
 function isSchemaError(error: unknown): boolean {
   return error instanceof Error && error.name === 'ZodError';
+}
+
+function getInitializeProtocolVersion(message: unknown): unknown {
+  if (!isRecord(message)) return undefined;
+  const { params } = message;
+  if (!isRecord(params)) return undefined;
+  const { protocolVersion } = params;
+  return protocolVersion;
+}
+
+function getProtocolVersionError(protocolVersion: unknown): string | undefined {
+  if (typeof protocolVersion !== 'string') {
+    return 'protocolVersion must be a string';
+  }
+  if (SERVER_SUPPORTED_PROTOCOL_VERSIONS.has(protocolVersion)) return undefined;
+  return `Unsupported protocolVersion: ${protocolVersion}`;
+}
+
+export function installStdioInitializationGuards(transport: unknown): void {
+  if (!isStdioMessageTransport(transport)) return;
+
+  const originalOnMessage = transport.onmessage;
+  if (!originalOnMessage) return;
+
+  const state = {
+    sawInitialize: false,
+    pendingInitIds: new Set<string>(),
+  };
+
+  if (transport.send) {
+    const originalSend = transport.send.bind(transport);
+    transport.send = (message: unknown) => {
+      try {
+        const response = parseJsonRpcResponse(message);
+        if (response) {
+          const key = getIdKey(response.id);
+          if (state.pendingInitIds.has(key)) {
+            state.pendingInitIds.delete(key);
+            if (response.error === undefined) {
+              state.sawInitialize = true;
+            }
+          }
+        }
+      } catch {
+        // Ignore send inspection errors.
+      }
+      return originalSend(message);
+    };
+  }
+
+  transport.onmessage = (message: unknown, extra?: unknown) => {
+    const methodMessage = parseJsonRpcMethodMessage(message);
+    if (methodMessage) {
+      if (methodMessage.method === 'initialize') {
+        if (!methodMessage.hasId) {
+          // initialize must be a request (not a notification).
+          return;
+        }
+        const error = getProtocolVersionError(
+          getInitializeProtocolVersion(message)
+        );
+        if (error) {
+          sendError(
+            transport,
+            ErrorCode.InvalidRequest,
+            error,
+            methodMessage.id
+          );
+          return;
+        }
+        state.pendingInitIds.add(getIdKey(methodMessage.id));
+        originalOnMessage(message, extra);
+        return;
+      }
+
+      if (!state.sawInitialize) {
+        if (methodMessage.hasId) {
+          sendError(
+            transport,
+            ErrorCode.InvalidRequest,
+            INIT_FIRST_ERROR_MESSAGE,
+            methodMessage.id
+          );
+        }
+        return;
+      }
+    }
+
+    originalOnMessage(message, extra);
+  };
 }
 
 export function installStdioInvalidMessageGuards(transport: unknown): void {

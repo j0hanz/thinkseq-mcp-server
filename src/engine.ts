@@ -144,10 +144,7 @@ export class ThinkingEngine {
 
     const activeThoughts = this.#store.getActiveThoughts();
     const lastActive = activeThoughts[activeThoughts.length - 1];
-    if (
-      lastActive !== undefined &&
-      lastActive.totalThoughts > ThinkingEngine.DEFAULT_TOTAL_THOUGHTS
-    ) {
+    if (lastActive !== undefined) {
       return lastActive.totalThoughts;
     }
 

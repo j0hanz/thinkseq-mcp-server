@@ -17,6 +17,14 @@ Use this server to record sequential thinking steps to plan, reason, and debug. 
 
 - **Thinking Step:** `thought` (text), `thoughtNumber` (int), `progress` (0-1), `isComplete` (bool)
 
+## Runtime Controls
+
+- **Retention (server CLI):** the server keeps a rolling in-memory history.
+  - `--max-thoughts <number>` controls how many total stored thoughts are retained (default is 500).
+  - `--max-memory-mb <number>` caps estimated memory use for stored thoughts (default is 100MB).
+- **Text content compatibility:** by default the tool returns both `structuredContent` and a JSON string in `content`.
+  - Set `THINKSEQ_INCLUDE_TEXT_CONTENT=0|false|no|off` to omit the JSON string and return only `structuredContent`.
+
 ## Workflows
 
 ### 1) Structured Reasoning
@@ -26,6 +34,11 @@ thinkseq(thought="Plan: 1. check, 2. fix", totalThoughts=5) → Start chain
 thinkseq(thought="Check passed, starting fix") → Progress chain
 thinkseq(thought="Revised plan: use new API", revisesThought=1) → Correction
 ```
+
+Notes:
+
+- `totalThoughts` is only an estimate for progress/completion (max 25); it does **not** change retention.
+- Revisions can only target active (non-superseded) thoughts.
 
 ## Tools
 

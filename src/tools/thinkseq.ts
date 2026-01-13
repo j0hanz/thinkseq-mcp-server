@@ -65,7 +65,7 @@ function publishToolStart(): void {
 
 type ToolEndParams =
   | { ok: true; durationMs: number }
-  | { ok: false; durationMs: number; errorMessage: string };
+  | { ok: false; durationMs: number; errorCode: string; errorMessage: string };
 
 function publishToolEnd(params: ToolEndParams): void {
   publishToolEvent({
@@ -76,7 +76,7 @@ function publishToolEnd(params: ToolEndParams): void {
       ? { ok: true, durationMs: params.durationMs }
       : {
           ok: false,
-          errorCode: 'E_THINK',
+          errorCode: params.errorCode,
           errorMessage: params.errorMessage,
           durationMs: params.durationMs,
         }),
@@ -146,12 +146,26 @@ async function handleThinkSeq(
     try {
       const result = await engine.processThought(normalized);
       const durationMs = getDurationMs(start);
-      publishToolEnd({ ok: true, durationMs });
+      if (result.ok) {
+        publishToolEnd({ ok: true, durationMs });
+      } else {
+        publishToolEnd({
+          ok: false,
+          errorCode: result.error.code,
+          errorMessage: result.error.message,
+          durationMs,
+        });
+      }
       return buildToolResponse(result, { includeTextContent });
     } catch (err) {
       const errorMessage = getErrorMessage(err);
       const durationMs = getDurationMs(start);
-      publishToolEnd({ ok: false, errorMessage, durationMs });
+      publishToolEnd({
+        ok: false,
+        errorCode: 'E_THINK',
+        errorMessage,
+        durationMs,
+      });
       return buildErrorResponse('E_THINK', errorMessage, includeTextContent);
     }
   });
