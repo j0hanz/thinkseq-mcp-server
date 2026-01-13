@@ -1,6 +1,8 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 
+import { readFileSync } from 'node:fs';
+
 import { ThinkingEngine } from '../engine.js';
 import { publishLifecycleEvent } from '../lib/diagnostics.js';
 import type { LifecycleEvent } from '../lib/diagnostics.js';
@@ -20,8 +22,22 @@ import type {
   TransportLike,
 } from './types.js';
 
-const SERVER_INSTRUCTIONS =
+const DEFAULT_SERVER_INSTRUCTIONS =
   'ThinkSeq is a tool for structured, sequential thinking with revision support.';
+
+function loadServerInstructions(): string {
+  try {
+    const raw = readFileSync(new URL('../instructions.md', import.meta.url), {
+      encoding: 'utf8',
+    });
+    const trimmed = raw.trim();
+    return trimmed.length > 0 ? trimmed : DEFAULT_SERVER_INSTRUCTIONS;
+  } catch {
+    return DEFAULT_SERVER_INSTRUCTIONS;
+  }
+}
+
+const SERVER_INSTRUCTIONS = loadServerInstructions();
 const DEFAULT_PACKAGE_READ_TIMEOUT_MS = 2000;
 
 export interface RunDependencies {
