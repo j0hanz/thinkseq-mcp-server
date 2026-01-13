@@ -93,6 +93,36 @@ void describe('ThinkingEngine.progress', () => {
     assert.strictEqual(r2.result.totalThoughts, 2);
     assert.strictEqual(r2.result.progress, 1);
   });
+
+  void it('should not decrease totalThoughts when a smaller value is provided later', () => {
+    const engine = new ThinkingEngine();
+
+    const r1 = engine.processThought({ thought: 'Step 1', totalThoughts: 10 });
+    assert.ok(r1.ok);
+    assert.strictEqual(r1.result.totalThoughts, 10);
+    assert.strictEqual(r1.result.progress, 0.1);
+
+    const r2 = engine.processThought({ thought: 'Step 2', totalThoughts: 2 });
+    assert.ok(r2.ok);
+    assert.strictEqual(r2.result.thoughtNumber, 2);
+    assert.strictEqual(r2.result.totalThoughts, 10);
+    assert.strictEqual(r2.result.progress, 0.2);
+  });
+
+  void it('should allow totalThoughts to increase later', () => {
+    const engine = new ThinkingEngine();
+
+    const r1 = engine.processThought({ thought: 'Step 1', totalThoughts: 3 });
+    assert.ok(r1.ok);
+    assert.strictEqual(r1.result.totalThoughts, 3);
+    assert.strictEqual(r1.result.progress, 1 / 3);
+
+    const r2 = engine.processThought({ thought: 'Step 2', totalThoughts: 10 });
+    assert.ok(r2.ok);
+    assert.strictEqual(r2.result.thoughtNumber, 2);
+    assert.strictEqual(r2.result.totalThoughts, 10);
+    assert.strictEqual(r2.result.progress, 0.2);
+  });
 });
 
 void describe('ThinkingEngine.characterization', () => {
@@ -247,6 +277,25 @@ void describe('ThinkingEngine.revision', () => {
     assert.strictEqual(r3.result.context.revisionInfo.revises, 1);
     assert.deepStrictEqual(r3.result.context.revisionInfo.supersedes, [1, 2]);
     assert.strictEqual(r3.result.context.revisionInfo.supersedesTotal, 2);
+  });
+
+  void it('should not decrease totalThoughts on revision when a smaller value is provided', () => {
+    const engine = new ThinkingEngine();
+
+    engine.processThought({ thought: 'A', totalThoughts: 10 });
+    engine.processThought({ thought: 'B', totalThoughts: 10 });
+
+    const r3 = engine.processThought({
+      thought: 'A revised',
+      totalThoughts: 2,
+      revisesThought: 1,
+    });
+
+    assert.ok(r3.ok);
+    assert.strictEqual(r3.result.thoughtNumber, 3);
+    assert.strictEqual(r3.result.totalThoughts, 10);
+    assert.strictEqual(r3.result.progress, 0.3);
+    assert.strictEqual(r3.result.isComplete, false);
   });
 
   void it('should preserve revision output shape (characterization)', () => {

@@ -12,6 +12,7 @@ export class ThoughtStore {
   #thoughtIndex = new Map<number, StoredThought>();
   #activeThoughts: StoredThought[] = [];
   #activeThoughtNumbers: number[] = [];
+  #activeMaxTotalThoughts = 0;
   #headIndex = 0;
   #nextThoughtNumber = 1;
   #estimatedBytes = 0;
@@ -31,9 +32,14 @@ export class ThoughtStore {
   } {
     const thoughtNumber = this.#nextThoughtNumber;
     this.#nextThoughtNumber += 1;
+    const effectiveTotalThoughts = Math.max(
+      totalThoughts,
+      thoughtNumber,
+      this.#activeMaxTotalThoughts
+    );
     return {
       thoughtNumber,
-      totalThoughts: Math.max(totalThoughts, thoughtNumber),
+      totalThoughts: effectiveTotalThoughts,
     };
   }
 
@@ -43,8 +49,20 @@ export class ThoughtStore {
     if (stored.isActive) {
       this.#activeThoughts.push(stored);
       this.#activeThoughtNumbers.push(stored.thoughtNumber);
+      this.#activeMaxTotalThoughts = Math.max(
+        this.#activeMaxTotalThoughts,
+        stored.totalThoughts
+      );
     }
     this.#estimatedBytes += this.#estimateThoughtBytes(stored);
+  }
+
+  #recomputeActiveMaxTotalThoughts(): void {
+    let maxTotal = 0;
+    for (const thought of this.#activeThoughts) {
+      maxTotal = Math.max(maxTotal, thought.totalThoughts);
+    }
+    this.#activeMaxTotalThoughts = maxTotal;
   }
 
   #findActiveThoughtIndex(thoughtNumber: number): number {
@@ -83,6 +101,7 @@ export class ThoughtStore {
     }
     this.#activeThoughts.length = startIndex;
     this.#activeThoughtNumbers.length = startIndex;
+    this.#recomputeActiveMaxTotalThoughts();
     return supersedes;
   }
 
@@ -133,6 +152,7 @@ export class ThoughtStore {
     if (startIndex === 0) return;
     this.#activeThoughts = this.#activeThoughts.slice(startIndex);
     this.#activeThoughtNumbers = this.#activeThoughtNumbers.slice(startIndex);
+    this.#recomputeActiveMaxTotalThoughts();
   }
 
   #removeOldest(count: number, options: { forceCompact?: boolean } = {}): void {
@@ -185,6 +205,7 @@ export class ThoughtStore {
     this.#thoughtIndex.clear();
     this.#activeThoughts = [];
     this.#activeThoughtNumbers = [];
+    this.#activeMaxTotalThoughts = 0;
     this.#headIndex = 0;
     this.#nextThoughtNumber = 1;
     this.#estimatedBytes = 0;
