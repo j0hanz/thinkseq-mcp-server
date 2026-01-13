@@ -1,7 +1,7 @@
+import { readFileSync } from 'node:fs';
+
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-
-import { readFileSync } from 'node:fs';
 
 import { ThinkingEngine } from '../engine.js';
 import { publishLifecycleEvent } from '../lib/diagnostics.js';

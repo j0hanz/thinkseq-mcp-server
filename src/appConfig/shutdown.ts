@@ -23,20 +23,28 @@ function hasClose(value: unknown): value is { close: CloseFn } {
   return isRecord(value) && typeof value.close === 'function';
 }
 
-async function closeWithTimeout(
-  value: unknown,
+async function closeSafely(value: unknown): Promise<void> {
+  try {
+    if (hasClose(value)) await value.close();
+  } catch {
+    return;
+  }
+}
+
+async function closeAllWithinTimeout(
+  values: readonly unknown[],
   timeoutMs: number
 ): Promise<void> {
   const timeout = new Promise<void>((resolve) =>
     setTimeout(resolve, timeoutMs)
   );
-  const attempt = (async () => {
-    try {
-      if (hasClose(value)) await value.close();
-    } catch {
+  const attempt = Promise.allSettled(values.map((value) => closeSafely(value)))
+    .then(() => {
       return;
-    }
-  })();
+    })
+    .catch(() => {
+      return;
+    });
   await Promise.race([attempt, timeout]);
 }
 
@@ -56,9 +64,10 @@ function buildShutdownRunner(
       ts: timestamp(),
       signal,
     });
-    await closeWithTimeout(deps.server, timeoutMs);
-    await closeWithTimeout(deps.engine, timeoutMs);
-    await closeWithTimeout(deps.transport, timeoutMs);
+    await closeAllWithinTimeout(
+      [deps.server, deps.engine, deps.transport],
+      timeoutMs
+    );
     proc.exit(0);
   };
 }
