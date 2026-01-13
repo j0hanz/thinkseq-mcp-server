@@ -55,3 +55,14 @@ export type ProcessResult =
       };
       result?: never;
     };
+
+export type CloseFn = () => Promise<void> | void;
+
+export type ProcessThought = (
+  input: ThoughtData
+) => ProcessResult | Promise<ProcessResult>;
+
+export interface EngineLike {
+  processThought: ProcessThought;
+  close?: CloseFn;
+}

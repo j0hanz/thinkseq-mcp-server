@@ -60,19 +60,18 @@ function wrapWithInitializationGuard(
   };
 }
 
-function getProtocolObject(
-  server: unknown
-): Record<string, unknown> | undefined {
+function getProtocolHandlers(server: unknown):
+  | {
+      protocol: Record<string, unknown>;
+      handlers: Map<unknown, unknown>;
+    }
+  | undefined {
   if (!isRecord(server)) return undefined;
   const protocol: unknown = Reflect.get(server, 'server');
-  return isRecord(protocol) ? protocol : undefined;
-}
-
-function getRequestHandlers(
-  protocol: Record<string, unknown>
-): Map<unknown, unknown> | undefined {
+  if (!isRecord(protocol)) return undefined;
   const handlers: unknown = Reflect.get(protocol, '_requestHandlers');
-  return handlers instanceof Map ? handlers : undefined;
+  if (!(handlers instanceof Map)) return undefined;
+  return { protocol, handlers };
 }
 
 function installFallbackRequestHandler(
@@ -106,13 +105,11 @@ function wrapRequestHandlers(
 }
 
 export function installInitializationGuards(server: unknown): void {
-  const protocol = getProtocolObject(server);
-  if (!protocol) return;
-  const handlers = getRequestHandlers(protocol);
-  if (!handlers) return;
+  const resolved = getProtocolHandlers(server);
+  if (!resolved) return;
 
   const state = { sawInitialize: false };
 
-  wrapRequestHandlers(handlers, state);
-  installFallbackRequestHandler(protocol, state);
+  wrapRequestHandlers(resolved.handlers, state);
+  installFallbackRequestHandler(resolved.protocol, state);
 }

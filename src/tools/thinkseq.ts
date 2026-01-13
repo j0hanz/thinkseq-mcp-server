@@ -4,12 +4,11 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 import type { z } from 'zod';
 
-import type { ThinkingEngine } from '../engine.js';
 import { runWithContext } from '../lib/context.js';
 import { publishToolEvent } from '../lib/diagnostics.js';
 import type { ErrorResponse } from '../lib/errors.js';
 import { createErrorResponse, getErrorMessage } from '../lib/errors.js';
-import type { ProcessResult, ThoughtData } from '../lib/types.js';
+import type { EngineLike, ProcessResult, ThoughtData } from '../lib/types.js';
 import { ThinkSeqInputSchema } from '../schemas/inputs.js';
 import { ThinkSeqOutputSchema } from '../schemas/outputs.js';
 
@@ -45,14 +44,6 @@ interface ToolRegistrar {
   registerTool: McpServer['registerTool'];
 }
 
-interface EngineLike {
-  processThought: (
-    input: ThoughtData
-  ) =>
-    | ReturnType<ThinkingEngine['processThought']>
-    | Promise<ReturnType<ThinkingEngine['processThought']>>;
-}
-
 type ThinkSeqInput = z.infer<typeof ThinkSeqInputSchema>;
 type ThinkSeqOutput = z.infer<typeof ThinkSeqOutputSchema>;
 
@@ -72,40 +63,45 @@ function publishToolStart(): void {
   });
 }
 
-function publishToolSuccess(durationMs: number): void {
+type ToolEndParams =
+  | { ok: true; durationMs: number }
+  | { ok: false; durationMs: number; errorMessage: string };
+
+function publishToolEnd(params: ToolEndParams): void {
   publishToolEvent({
     type: 'tool.end',
     tool: 'thinkseq',
     ts: Date.now(),
-    ok: true,
-    durationMs,
+    ...(params.ok
+      ? { ok: true, durationMs: params.durationMs }
+      : {
+          ok: false,
+          errorCode: 'E_THINK',
+          errorMessage: params.errorMessage,
+          durationMs: params.durationMs,
+        }),
   });
 }
 
-function publishToolFailure(errorMessage: string, durationMs: number): void {
-  publishToolEvent({
-    type: 'tool.end',
-    tool: 'thinkseq',
-    ts: Date.now(),
-    ok: false,
-    errorCode: 'E_THINK',
-    errorMessage,
-    durationMs,
+function buildErrorResponse(
+  code: string,
+  message: string,
+  includeTextContent: boolean
+): ToolResponse {
+  return createErrorResponse(code, message, undefined, {
+    includeTextContent,
   });
 }
 
-function buildSuccessResponse(
+function buildToolResponse(
   result: ProcessResult,
   options: { includeTextContent: boolean }
 ): ToolResponse {
   if (!result.ok) {
-    return createErrorResponse(
+    return buildErrorResponse(
       result.error.code,
       result.error.message,
-      undefined,
-      {
-        includeTextContent: options.includeTextContent,
-      }
+      options.includeTextContent
     );
   }
   const structured: ThinkSeqOutput = {
@@ -150,15 +146,13 @@ async function handleThinkSeq(
     try {
       const result = await engine.processThought(normalized);
       const durationMs = getDurationMs(start);
-      publishToolSuccess(durationMs);
-      return buildSuccessResponse(result, { includeTextContent });
+      publishToolEnd({ ok: true, durationMs });
+      return buildToolResponse(result, { includeTextContent });
     } catch (err) {
       const errorMessage = getErrorMessage(err);
       const durationMs = getDurationMs(start);
-      publishToolFailure(errorMessage, durationMs);
-      return createErrorResponse('E_THINK', errorMessage, undefined, {
-        includeTextContent,
-      });
+      publishToolEnd({ ok: false, errorMessage, durationMs });
+      return buildErrorResponse('E_THINK', errorMessage, includeTextContent);
     }
   });
 }

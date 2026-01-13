@@ -165,22 +165,19 @@ export class ThoughtStore {
 
   #compactIfNeeded(force = false): void {
     if (this.#headIndex === 0) return;
-    const totalLength = this.getTotalLength();
-    if (totalLength === 0) {
+    if (this.getTotalLength() === 0) {
       this.#resetThoughts();
       return;
     }
-    if (!this.#shouldCompact(force)) return;
+    if (
+      !force &&
+      this.#headIndex < COMPACT_THRESHOLD &&
+      this.#headIndex < this.#thoughts.length * COMPACT_RATIO
+    ) {
+      return;
+    }
     this.#thoughts = this.#thoughts.slice(this.#headIndex);
     this.#headIndex = 0;
-  }
-
-  #shouldCompact(force: boolean): boolean {
-    if (force) return true;
-    return (
-      this.#headIndex >= COMPACT_THRESHOLD ||
-      this.#headIndex >= this.#thoughts.length * COMPACT_RATIO
-    );
   }
 
   #resetThoughts(): void {

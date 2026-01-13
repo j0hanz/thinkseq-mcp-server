@@ -18,8 +18,6 @@ export interface PackageJsonDependencies {
 }
 
 const defaultReadFile: ReadFile = (path, options) => readFile(path, options);
-const defaultCwd = (): string => process.cwd();
-
 const defaultPackageJsonPath = fileURLToPath(
   new URL('../../package.json', import.meta.url)
 );
@@ -56,26 +54,10 @@ function parsePackageJson(raw: string): PackageInfo {
   }
 }
 
-function resolveReadFile(deps?: PackageJsonDependencies): ReadFile {
-  return deps?.readFile ?? defaultReadFile;
-}
-
-function resolveCwd(deps?: PackageJsonDependencies): () => string {
-  return deps?.cwd ?? defaultCwd;
-}
-
 function resolvePackageJsonPath(deps?: PackageJsonDependencies): string {
   // Only honor cwd injection when readFile is also injected (test seam).
-  if (deps?.readFile && deps.cwd)
-    return join(resolveCwd(deps)(), 'package.json');
+  if (deps?.readFile && deps.cwd) return join(deps.cwd(), 'package.json');
   return defaultPackageJsonPath;
-}
-
-function buildReadOptions(signal?: AbortSignal): {
-  encoding: 'utf8';
-  signal?: AbortSignal;
-} {
-  return signal ? { encoding: 'utf8', signal } : { encoding: 'utf8' };
 }
 
 export async function readSelfPackageJson(
@@ -83,10 +65,10 @@ export async function readSelfPackageJson(
   deps?: PackageJsonDependencies
 ): Promise<PackageInfo> {
   try {
-    const readFileImpl = resolveReadFile(deps);
+    const readFileImpl = deps?.readFile ?? defaultReadFile;
     const raw = await readFileImpl(
       resolvePackageJsonPath(deps),
-      buildReadOptions(signal)
+      signal ? { encoding: 'utf8', signal } : { encoding: 'utf8' }
     );
     return parsePackageJson(raw);
   } catch {

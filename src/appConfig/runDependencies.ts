@@ -22,18 +22,17 @@ import type {
   TransportLike,
 } from './types.js';
 
-const DEFAULT_SERVER_INSTRUCTIONS =
-  'ThinkSeq is a tool for structured, sequential thinking with revision support.';
-
 function loadServerInstructions(): string {
+  const fallback =
+    'ThinkSeq is a tool for structured, sequential thinking with revision support.';
   try {
     const raw = readFileSync(new URL('../instructions.md', import.meta.url), {
       encoding: 'utf8',
     });
     const trimmed = raw.trim();
-    return trimmed.length > 0 ? trimmed : DEFAULT_SERVER_INSTRUCTIONS;
+    return trimmed.length > 0 ? trimmed : fallback;
   } catch {
-    return DEFAULT_SERVER_INSTRUCTIONS;
+    return fallback;
   }
 }
 
@@ -95,64 +94,25 @@ const defaultConnectServer = async (
   return transport;
 };
 
-function resolveCoreDependencies(
+export function resolveRunDependencies(
   deps: RunDependencies
-): Pick<
-  ResolvedRunDependencies,
-  | 'processLike'
-  | 'packageReadTimeoutMs'
-  | 'readPackageJson'
-  | 'publishLifecycleEvent'
-  | 'now'
-> {
+): ResolvedRunDependencies {
   return {
     processLike: deps.processLike ?? process,
     packageReadTimeoutMs:
       deps.packageReadTimeoutMs ?? DEFAULT_PACKAGE_READ_TIMEOUT_MS,
     readPackageJson: deps.readPackageJson ?? readSelfPackageJson,
     publishLifecycleEvent: deps.publishLifecycleEvent ?? publishLifecycleEvent,
-    now: deps.now ?? Date.now,
-  };
-}
-
-function resolveServerDependencies(
-  deps: RunDependencies
-): Pick<ResolvedRunDependencies, 'createServer' | 'connectServer'> {
-  return {
     createServer: deps.createServer ?? defaultCreateServer,
     connectServer: deps.connectServer ?? defaultConnectServer,
-  };
-}
-
-function resolveEngineDependencies(
-  deps: RunDependencies
-): Pick<
-  ResolvedRunDependencies,
-  'registerTool' | 'engineFactory' | 'installShutdownHandlers'
-> {
-  return {
     registerTool: deps.registerTool ?? registerThinkSeq,
     engineFactory: deps.engineFactory ?? (() => new ThinkingEngine()),
     installShutdownHandlers:
       deps.installShutdownHandlers ?? installShutdownHandlers,
-  };
-}
-
-function resolveShutdownTimeout(
-  deps: RunDependencies
-): Pick<ResolvedRunDependencies, 'shutdownTimeoutMs'> {
-  if (deps.shutdownTimeoutMs === undefined) return {};
-  return { shutdownTimeoutMs: deps.shutdownTimeoutMs };
-}
-
-export function resolveRunDependencies(
-  deps: RunDependencies
-): ResolvedRunDependencies {
-  return {
-    ...resolveCoreDependencies(deps),
-    ...resolveServerDependencies(deps),
-    ...resolveEngineDependencies(deps),
-    ...resolveShutdownTimeout(deps),
+    now: deps.now ?? Date.now,
+    ...(deps.shutdownTimeoutMs !== undefined
+      ? { shutdownTimeoutMs: deps.shutdownTimeoutMs }
+      : {}),
   };
 }
 

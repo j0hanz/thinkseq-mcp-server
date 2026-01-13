@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { parseCliConfig } from '../src/lib/cli.js';
+import { getCliHelpText, parseCliConfig } from '../src/lib/cli.js';
 
 void describe('cli.parseCliConfig', () => {
   void it('parses numeric options', () => {
@@ -35,5 +35,9 @@ void describe('cli.parseCliConfig', () => {
   void it('rejects invalid numeric values', () => {
     assert.throws(() => parseCliConfig(['--max-thoughts', '0']));
     assert.throws(() => parseCliConfig(['--max-memory-mb', 'abc']));
+  });
+
+  void it('returns help text', () => {
+    assert.match(getCliHelpText(), /Usage: thinkseq/);
   });
 });

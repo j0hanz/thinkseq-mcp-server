@@ -8,38 +8,27 @@ export function resolveRevisionTarget(
   input: ThoughtData,
   getThoughtByNumber: (thoughtNumber: number) => StoredThought | undefined
 ): { ok: true; targetNumber: number } | { ok: false; error: ProcessResult } {
-  const targetNumberResult = getRevisionTargetNumber(input);
-  if (!targetNumberResult.ok) {
-    return targetNumberResult;
+  const targetNumber = input.revisesThought;
+  if (targetNumber === undefined) {
+    return {
+      ok: false,
+      error: buildRevisionError(
+        'E_REVISION_MISSING',
+        'revisesThought is required for revision'
+      ),
+    };
   }
 
   const validationError = validateRevisionTarget(
     getThoughtByNumber,
-    targetNumberResult.targetNumber
+    targetNumber
   );
 
   if (validationError) {
     return { ok: false, error: validationError };
   }
 
-  return { ok: true, targetNumber: targetNumberResult.targetNumber };
-}
-
-function getRevisionTargetNumber(
-  input: ThoughtData
-): { ok: true; targetNumber: number } | { ok: false; error: ProcessResult } {
-  const targetNumber = input.revisesThought;
-  if (targetNumber !== undefined) {
-    return { ok: true, targetNumber };
-  }
-
-  return {
-    ok: false,
-    error: buildRevisionError(
-      'E_REVISION_MISSING',
-      'revisesThought is required for revision'
-    ),
-  };
+  return { ok: true, targetNumber };
 }
 
 function validateRevisionTarget(

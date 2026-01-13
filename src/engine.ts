@@ -61,11 +61,8 @@ export class ThinkingEngine {
   }
 
   #processNewThought(input: ThoughtData): ProcessResult {
-    const effectiveTotalThoughts = this.#resolveEffectiveTotalThoughts(input);
-    const numbers = this.#store.nextThoughtNumbers(effectiveTotalThoughts);
-    const stored = this.#buildStoredThought(input, numbers);
-    this.#store.storeThought(stored);
-    this.#store.pruneHistoryIfNeeded();
+    const { stored } = this.#createStoredThought(input);
+    this.#commitThought(stored);
     return this.#buildProcessResult(stored);
   }
 
@@ -76,8 +73,9 @@ export class ThinkingEngine {
     if (!resolved.ok) return resolved.error;
     const { targetNumber } = resolved;
 
-    const effectiveTotalThoughts = this.#resolveEffectiveTotalThoughts(input);
-    const numbers = this.#store.nextThoughtNumbers(effectiveTotalThoughts);
+    const { numbers, stored } = this.#createStoredThought(input, {
+      revisionOf: targetNumber,
+    });
     const supersedesAll = this.#store.supersedeFrom(
       targetNumber,
       numbers.thoughtNumber
@@ -85,14 +83,8 @@ export class ThinkingEngine {
     const supersedesTotal = supersedesAll.length;
     const supersedes = capArrayStart(supersedesAll, MAX_SUPERSEDES);
 
-    const stored = this.#buildStoredThought(input, {
-      ...numbers,
-      revisionOf: targetNumber,
-    });
-
-    this.#store.storeThought(stored);
     this.#hasRevisions = true;
-    this.#store.pruneHistoryIfNeeded();
+    this.#commitThought(stored);
 
     return this.#buildProcessResult(stored, {
       revises: targetNumber,
@@ -122,6 +114,27 @@ export class ThinkingEngine {
         revisionOf: details.revisionOf,
       }),
     };
+  }
+
+  #createStoredThought(
+    input: ThoughtData,
+    extras: { revisionOf?: number } = {}
+  ): {
+    stored: StoredThought;
+    numbers: { thoughtNumber: number; totalThoughts: number };
+  } {
+    const effectiveTotalThoughts = this.#resolveEffectiveTotalThoughts(input);
+    const numbers = this.#store.nextThoughtNumbers(effectiveTotalThoughts);
+    const stored = this.#buildStoredThought(input, {
+      ...numbers,
+      ...extras,
+    });
+    return { stored, numbers };
+  }
+
+  #commitThought(stored: StoredThought): void {
+    this.#store.storeThought(stored);
+    this.#store.pruneHistoryIfNeeded();
   }
 
   #resolveEffectiveTotalThoughts(input: ThoughtData): number {

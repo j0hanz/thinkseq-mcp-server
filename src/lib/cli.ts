@@ -37,6 +37,25 @@ Options:
 type ParsedValues = ReturnType<typeof parseArgs<typeof PARSE_CONFIG>>['values'];
 const BYTES_PER_MB = 1024 * 1024;
 
+type CliOptionKey = Exclude<keyof typeof PARSE_CONFIG.options, 'help'>;
+
+interface OptionSpec {
+  key: CliOptionKey;
+  configKey: keyof CliConfig;
+  map?: (value: number) => number;
+}
+
+const CLI_OPTION_SPECS: readonly OptionSpec[] = [
+  { key: 'max-thoughts', configKey: 'maxThoughts' },
+  {
+    key: 'max-memory-mb',
+    configKey: 'maxMemoryBytes',
+    map: (value: number) => value * BYTES_PER_MB,
+  },
+  { key: 'shutdown-timeout-ms', configKey: 'shutdownTimeoutMs' },
+  { key: 'package-read-timeout-ms', configKey: 'packageReadTimeoutMs' },
+];
+
 function parsePositiveInt(
   value: string | undefined,
   label: string
@@ -65,33 +84,13 @@ function getStringOption(
 }
 
 function buildCliConfig(values: ParsedValues): CliConfig {
-  const maxThoughts = parsePositiveInt(
-    getStringOption(values, 'max-thoughts'),
-    'max-thoughts'
-  );
-  const maxMemoryMb = parsePositiveInt(
-    getStringOption(values, 'max-memory-mb'),
-    'max-memory-mb'
-  );
-  const shutdownTimeoutMs = parsePositiveInt(
-    getStringOption(values, 'shutdown-timeout-ms'),
-    'shutdown-timeout-ms'
-  );
-  const packageReadTimeoutMs = parsePositiveInt(
-    getStringOption(values, 'package-read-timeout-ms'),
-    'package-read-timeout-ms'
-  );
-
   const config: CliConfig = {};
-  if (maxThoughts !== undefined) config.maxThoughts = maxThoughts;
-  if (maxMemoryMb !== undefined) {
-    config.maxMemoryBytes = maxMemoryMb * BYTES_PER_MB;
-  }
-  if (shutdownTimeoutMs !== undefined) {
-    config.shutdownTimeoutMs = shutdownTimeoutMs;
-  }
-  if (packageReadTimeoutMs !== undefined) {
-    config.packageReadTimeoutMs = packageReadTimeoutMs;
+  for (const spec of CLI_OPTION_SPECS) {
+    const raw = getStringOption(values, spec.key);
+    const parsed = parsePositiveInt(raw, spec.key);
+    if (parsed === undefined) continue;
+    const mapped = spec.map ? spec.map(parsed) : parsed;
+    config[spec.configKey] = mapped;
   }
 
   return config;

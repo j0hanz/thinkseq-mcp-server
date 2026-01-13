@@ -165,6 +165,28 @@ void describe('tools.registerThinkSeq handler error', () => {
     assert.deepEqual(response.structuredContent.ok, false);
     assert.deepEqual(response.structuredContent.error?.code, 'E_THINK');
   });
+
+  void it('returns an error response when engine returns a failure result', async () => {
+    const server = new FakeServer();
+    const engine = {
+      processThought: (): ProcessResult => ({
+        ok: false,
+        error: { code: 'E_TEST', message: 'bad input' },
+      }),
+    };
+
+    registerThinkSeq(server, engine);
+    assert.ok(server.registered);
+
+    const response = await server.registered.handler(createThoughtInput());
+    assert.equal(response.isError, true);
+    assert.deepEqual(response.structuredContent.ok, false);
+    assert.deepEqual(response.structuredContent.error?.code, 'E_TEST');
+    assert.equal(
+      response.content[0].text,
+      JSON.stringify(response.structuredContent)
+    );
+  });
 });
 
 function isRecord(value: unknown): value is Record<string, unknown> {

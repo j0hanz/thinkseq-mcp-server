@@ -4,19 +4,11 @@ import type {
   StoredThought,
 } from '../lib/types.js';
 
-function getRecentActiveThoughts(
-  activeThoughts: readonly StoredThought[],
-  limit: number
-): StoredThought[] {
-  if (limit <= 0) return [];
-  return activeThoughts.slice(-limit);
-}
-
 export function buildContextSummary(
   activeThoughts: readonly StoredThought[],
   revisionInfo?: RevisionInfo
 ): ContextSummary {
-  const recent = getRecentActiveThoughts(activeThoughts, 5);
+  const recent = activeThoughts.slice(-5);
   const startIndex = activeThoughts.length - recent.length;
   const recentThoughts = recent.map((thought, index) => ({
     stepIndex: startIndex + index + 1,

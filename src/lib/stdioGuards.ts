@@ -35,14 +35,6 @@ function sendError(
   });
 }
 
-function sendInvalidRequest(transport: StdioMessageTransportLike): void {
-  sendError(transport, ErrorCode.InvalidRequest, 'Invalid Request');
-}
-
-function sendParseError(transport: StdioMessageTransportLike): void {
-  sendError(transport, ErrorCode.ParseError, 'Parse error');
-}
-
 function isInvalidJsonRpcMessageShape(message: unknown): boolean {
   return (
     message === null || typeof message !== 'object' || Array.isArray(message)
@@ -67,7 +59,7 @@ export function installStdioInvalidMessageGuards(transport: unknown): void {
     // MCP stdio is line-delimited JSON-RPC (one object per line). JSON-RPC
     // batching is removed in newer revisions; treat arrays as invalid.
     if (isInvalidJsonRpcMessageShape(message)) {
-      sendInvalidRequest(transport);
+      sendError(transport, ErrorCode.InvalidRequest, 'Invalid Request');
       return;
     }
 
@@ -83,12 +75,12 @@ export function installStdioParseErrorResponder(transport: unknown): void {
     originalOnError?.(error);
 
     if (isParseError(error)) {
-      sendParseError(transport);
+      sendError(transport, ErrorCode.ParseError, 'Parse error');
       return;
     }
 
     if (isSchemaError(error)) {
-      sendInvalidRequest(transport);
+      sendError(transport, ErrorCode.InvalidRequest, 'Invalid Request');
     }
   };
 }
