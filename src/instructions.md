@@ -1,66 +1,63 @@
-# ThinkSeq MCP Server — Instructions
+# ThinkSeq MCP Server — AI Usage Instructions
 
-## What this server does
+Use this server to record sequential thinking steps to plan, reason, and debug. Prefer these tools over "remembering" state in chat.
 
-ThinkSeq exposes one MCP tool, `thinkseq`, to help you keep a short, numbered chain of reasoning steps with progress tracking and revision support.
+## Operating Rules
 
-- State is in-memory only and resets when the server restarts.
-- Keep each step concise; this is a structure/coordination tool, not a scratchpad for long text.
+- Keep thoughts atomic: one decision, calculation, or action per step.
+- Use revisions to fix mistakes in the active chain instead of apologizing in chat.
+- If request is vague, ask clarifying questions.
 
-## Available tools
+### Strategies
 
-### `thinkseq`
+- **Discovery:** Read the tool output's `context` to see recent thoughts and available revision targets.
+- **Action:** Use `thinkseq` to advance the reasoning chain or `revisesThought` to rewind and correct.
 
-Record a single sequential thinking step.
+## Data Model
 
-**Use it when:**
+- **Thinking Step:** `thought` (text), `thoughtNumber` (int), `progress` (0-1), `isComplete` (bool)
 
-- You want a small, explicit plan (step-by-step) and a progress signal.
-- You want a lightweight decision log (assumptions → choice → next action).
-- You are debugging and want a clear hypothesis → check → result chain.
+## Workflows
 
-**Do not use it for:**
+### 1) Structured Reasoning
 
-- Long-form writing or dumping large transcripts.
-- Storing secrets, credentials, or personal data.
+```text
+thinkseq(thought="Plan: 1. check, 2. fix", totalThoughts=5) → Start chain
+thinkseq(thought="Check passed, starting fix") → Progress chain
+thinkseq(thought="Revised plan: use new API", revisesThought=1) → Correction
+```
 
-**Inputs:**
+## Tools
 
-- `thought` (string, 1–5000 chars, required): one concise step.
-- `totalThoughts` (int, 1–25, optional): estimated total steps (default: 3).
-- `revisesThought` (int ≥ 1, optional): revise a previous step by its `thoughtNumber`.
+### thinkseq
 
-**Revision semantics (important):**
+Record a concise thinking step (max 5000 chars). Be brief: capture only the essential insight, calculation, or decision.
 
-- A revision is a destructive rewind of the _active chain_.
-- When you set `revisesThought`, the tool supersedes the targeted thought and every later _active_ thought, then continues from your corrected step.
-- Superseded thoughts remain in history for audit, but they are no longer in the active chain.
+- **Use when:** You need to structured reasoning, planning, or a decision log.
+- **Args:**
+  - `thought` (string, required): Your current thinking step.
+  - `totalThoughts` (number, optional): Estimated total thoughts (1-25, default: 3).
+  - `revisesThought` (number, optional): Revise a previous thought by number.
+- **Returns:** `thoughtNumber`, `progress`, `isComplete`, `revisableThoughts`, `context` (history previews).
 
-**Outputs (prefer `structuredContent`):**
+## Response Shape
 
-- `result.progress` in [0, 1] and `result.isComplete`
-- `result.revisableThoughts`: thought numbers you can revise
-- `result.context.recentThoughts`: previews of the current active chain
-- `result.context.revisionInfo`: present only when a revision occurred
+Success: `{ "ok": true, "result": { ... } }`
+Error: `{ "ok": false, "error": { "code": "...", "message": "..." } }`
 
-## Recommended workflow
+### Common Errors
 
-1. Set `totalThoughts` once at the start (adjust later if needed).
-2. Call `thinkseq` once per step; keep `thought` focused (one decision, one calculation, or one next action).
-3. If you discover an earlier mistake, call `thinkseq` again with `revisesThought` to correct it.
-4. Stop using the tool when `isComplete` becomes `true` (or once you have enough structure to proceed).
+| Code                           | Meaning                                | Resolution                                |
+| ------------------------------ | -------------------------------------- | ----------------------------------------- |
+| `E_REVISION_TARGET_NOT_FOUND`  | Revision target ID does not exist      | Check `revisableThoughts` for valid IDs   |
+| `E_REVISION_TARGET_SUPERSEDED` | Target thought was already overwritten | Revise the current active thought instead |
+| `E_THINK`                      | Generic engine error                   | Check arguments and retry                 |
 
-## Response handling guidance
+## Limits
 
-- Don’t paste raw tool JSON to the user unless they ask.
-- Use the tool output to write a clean, user-facing summary and next steps.
+- **Max Thoughts:** 25 (default estimate)
+- **Max Length:** 5000 chars per thought
 
-## Common errors
+## Security
 
-- `E_REVISION_TARGET_NOT_FOUND`: the target thought number doesn’t exist.
-- `E_REVISION_TARGET_SUPERSEDED`: the target thought is no longer active.
-- `E_THINK`: unexpected server-side failure.
-
-## Optional configuration
-
-- `THINKSEQ_INCLUDE_TEXT_CONTENT`: when set to `0`/`false`/`no`/`off`, the tool returns no `content` text and you should rely on `structuredContent`.
+- Do not store credentials, secrets, or PII in thoughts. State is in-memory only but may be logged.
