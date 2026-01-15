@@ -1,6 +1,6 @@
 # ThinkSeq Instructions
 
-> **Guidance for the Agent:** These instructions are available as a resource (`internal://instructions`).
+> **Guidance for the Agent:** These instructions are available as a resource (`internal://instructions`). Load them when you are confused about tool usage.
 
 ## 1. Core Capability
 
