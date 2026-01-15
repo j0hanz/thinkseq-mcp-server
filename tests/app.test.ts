@@ -115,6 +115,7 @@ type RunState = {
   server: {
     registerTool: () => unknown;
     connect: (transport: unknown) => Promise<void>;
+    sendLoggingMessage: () => Promise<void>;
   };
   transport: {
     start: () => Promise<void>;
@@ -141,6 +142,7 @@ const createRunState = (): RunState => {
     server: {
       registerTool: () => ({}),
       connect: () => Promise.resolve(),
+      sendLoggingMessage: () => Promise.resolve(),
     },
     transport: {
       start: () => Promise.resolve(),

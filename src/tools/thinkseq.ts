@@ -1,6 +1,11 @@
 import { performance } from 'node:perf_hooks';
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
+import type {
+  ServerNotification,
+  ServerRequest,
+} from '@modelcontextprotocol/sdk/types.js';
 
 import type { z } from 'zod';
 
@@ -46,6 +51,7 @@ interface ToolRegistrar {
 
 type ThinkSeqInput = z.infer<typeof ThinkSeqInputSchema>;
 type ThinkSeqOutput = z.infer<typeof ThinkSeqOutputSchema>;
+type ToolExtra = RequestHandlerExtra<ServerRequest, ServerNotification>;
 
 type ToolResponse =
   | ErrorResponse
@@ -126,10 +132,38 @@ function getDurationMs(start: number): number {
   return Math.max(0, performance.now() - start);
 }
 
+async function sendProgress(
+  extra: ToolExtra | undefined,
+  progress: number,
+  message?: string
+): Promise<void> {
+  if (!extra) return;
+  const progressToken = extra._meta?.progressToken;
+  if (progressToken === undefined) return;
+  try {
+    await extra.sendNotification({
+      method: 'notifications/progress',
+      params: {
+        progressToken,
+        progress,
+        total: 1,
+        ...(message ? { message } : {}),
+      },
+    });
+  } catch {
+    return;
+  }
+}
+
 async function handleThinkSeq(
   engine: EngineLike,
-  input: ThinkSeqInput
+  input: ThinkSeqInput,
+  extra?: ToolExtra
 ): Promise<ToolResponse> {
+  const requestId = extra?.requestId;
+  const context =
+    requestId === undefined ? undefined : { requestId: String(requestId) };
+
   return runWithContext(async () => {
     const includeTextContent = resolveIncludeTextContent();
     const normalized: ThoughtData = {
@@ -142,12 +176,14 @@ async function handleThinkSeq(
       }),
     };
     publishToolStart();
+    await sendProgress(extra, 0, 'started');
     const start = performance.now();
     try {
       const result = await engine.processThought(normalized);
       const durationMs = getDurationMs(start);
       if (result.ok) {
         publishToolEnd({ ok: true, durationMs });
+        await sendProgress(extra, result.result.progress, 'completed');
       } else {
         publishToolEnd({
           ok: false,
@@ -155,6 +191,7 @@ async function handleThinkSeq(
           errorMessage: result.error.message,
           durationMs,
         });
+        await sendProgress(extra, 1, 'failed');
       }
       return buildToolResponse(result, { includeTextContent });
     } catch (err) {
@@ -166,16 +203,17 @@ async function handleThinkSeq(
         errorMessage,
         durationMs,
       });
+      await sendProgress(extra, 1, 'failed');
       return buildErrorResponse('E_THINK', errorMessage, includeTextContent);
     }
-  });
+  }, context);
 }
 
 export function registerThinkSeq(
   server: ToolRegistrar,
   engine: EngineLike
 ): void {
-  server.registerTool('thinkseq', THINKSEQ_TOOL_DEFINITION, (input) =>
-    handleThinkSeq(engine, input)
+  server.registerTool('thinkseq', THINKSEQ_TOOL_DEFINITION, (input, extra) =>
+    handleThinkSeq(engine, input, extra)
   );
 }

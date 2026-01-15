@@ -79,7 +79,7 @@ const defaultCreateServer = (name: string, version: string): ServerLike => {
     { name, version },
     {
       instructions: SERVER_INSTRUCTIONS,
-      capabilities: { logging: {} },
+      capabilities: { logging: {}, tools: { listChanged: true } },
     }
   );
 };

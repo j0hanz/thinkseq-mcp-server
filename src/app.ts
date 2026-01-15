@@ -5,6 +5,7 @@ import {
   resolveRunDependencies,
   type RunDependencies,
 } from './appConfig.js';
+import { installMcpLogging } from './lib/mcpLogging.js';
 
 interface ProcessErrorHandlerDeps {
   processLike?: ProcessLike;
@@ -50,12 +51,14 @@ export async function run(deps: RunDependencies = {}): Promise<void> {
   );
   const { name, version } = resolvePackageIdentity(pkg);
 
+  const server = resolved.createServer(name, version);
+  installMcpLogging(server);
+
   resolved.publishLifecycleEvent({
     type: 'lifecycle.started',
     ts: resolved.now(),
   });
 
-  const server = resolved.createServer(name, version);
   const engine = resolved.engineFactory();
   resolved.registerTool(server, engine);
 

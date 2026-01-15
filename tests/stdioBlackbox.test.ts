@@ -231,6 +231,13 @@ void describe('stdio black-box regression', () => {
     const initOk = await server.waitForResponse(4);
     assert.ok(!initOk.error);
     assert.ok(initOk.result);
+    const initResult = initOk.result as Record<string, unknown>;
+    const capabilities = initResult.capabilities as Record<string, unknown>;
+    assert.ok(capabilities);
+    const tools = capabilities.tools as Record<string, unknown>;
+    assert.ok(tools);
+    assert.equal(tools.listChanged, true);
+    assert.ok(capabilities.logging && typeof capabilities.logging === 'object');
 
     // 6) tools/list now succeeds
     server.sendRaw(JSON.stringify(buildRequest(5, 'tools/list')));

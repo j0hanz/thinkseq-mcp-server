@@ -70,6 +70,7 @@ void describe('appConfig.resolveRunDependencies', () => {
     const server = resolved.createServer('thinkseq', '0.0.0');
     assert.equal(typeof server.connect, 'function');
     assert.equal(typeof server.registerTool, 'function');
+    assert.equal(typeof server.sendLoggingMessage, 'function');
 
     let connected = false;
     const stubServer: ServerLike = {
@@ -78,6 +79,7 @@ void describe('appConfig.resolveRunDependencies', () => {
         assert.ok(transport);
       },
       registerTool: () => ({}),
+      sendLoggingMessage: async () => undefined,
     };
 
     const transport = await resolved.connectServer(stubServer);
@@ -95,6 +97,7 @@ void describe('appConfig.resolveRunDependencies', () => {
     const createServer = (): ServerLike => ({
       connect: async () => undefined,
       registerTool: () => undefined,
+      sendLoggingMessage: async () => undefined,
     });
     const connectServer = async () => ({});
     const registerTool = () => undefined;
