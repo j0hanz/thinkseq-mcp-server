@@ -29,10 +29,6 @@ import type {
 const INSTRUCTIONS_URL = new URL('../instructions.md', import.meta.url);
 const INSTRUCTIONS_FALLBACK =
   'ThinkSeq is a tool for structured, sequential thinking with revision support.';
-const WORKFLOW_PROMPT_URL = new URL(
-  '../../.github/prompts/mcp-workflow.prompt.md',
-  import.meta.url
-);
 
 function readInstructionsText(): string {
   try {
@@ -46,14 +42,6 @@ function loadServerInstructions(): string {
   const raw = readInstructionsText();
   const trimmed = raw.trim();
   return trimmed.length > 0 ? trimmed : INSTRUCTIONS_FALLBACK;
-}
-
-function readWorkflowPrompt(): string {
-  try {
-    return readFileSync(WORKFLOW_PROMPT_URL, { encoding: 'utf8' });
-  } catch {
-    return '';
-  }
 }
 
 function registerInstructionsResource(server: ServerLike): void {
@@ -74,7 +62,6 @@ function registerInstructionsResource(server: ServerLike): void {
 }
 
 const SERVER_INSTRUCTIONS = loadServerInstructions();
-const WORKFLOW_PROMPT = readWorkflowPrompt();
 const DEFAULT_PACKAGE_READ_TIMEOUT_MS = 2000;
 
 export interface RunDependencies {
@@ -138,24 +125,6 @@ const defaultCreateServer = (name: string, version: string): ServerLike => {
           content: {
             type: 'text',
             text: SERVER_INSTRUCTIONS,
-          },
-        },
-      ],
-    })
-  );
-
-  server.registerPrompt(
-    'mcp-workflow-audit',
-    {
-      description: 'Audit an MCP server codebase for protocol compliance',
-    },
-    () => ({
-      messages: [
-        {
-          role: 'user',
-          content: {
-            type: 'text',
-            text: WORKFLOW_PROMPT,
           },
         },
       ],
