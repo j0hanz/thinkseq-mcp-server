@@ -70,6 +70,8 @@ void describe('appConfig.resolveRunDependencies', () => {
     const server = resolved.createServer('thinkseq', '0.0.0');
     assert.equal(typeof server.connect, 'function');
     assert.equal(typeof server.registerTool, 'function');
+    assert.equal(typeof server.registerResource, 'function');
+    assert.equal(typeof server.registerPrompt, 'function');
     assert.equal(typeof server.sendLoggingMessage, 'function');
 
     let connected = false;
@@ -79,6 +81,8 @@ void describe('appConfig.resolveRunDependencies', () => {
         assert.ok(transport);
       },
       registerTool: () => ({}),
+      registerResource: () => ({}),
+      registerPrompt: () => ({}),
       sendLoggingMessage: async () => undefined,
     };
 
@@ -97,6 +101,8 @@ void describe('appConfig.resolveRunDependencies', () => {
     const createServer = (): ServerLike => ({
       connect: async () => undefined,
       registerTool: () => undefined,
+      registerResource: () => undefined,
+      registerPrompt: () => undefined,
       sendLoggingMessage: async () => undefined,
     });
     const connectServer = async () => ({});

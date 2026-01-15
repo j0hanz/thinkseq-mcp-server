@@ -74,6 +74,7 @@ function registerInstructionsResource(server: ServerLike): void {
 }
 
 const SERVER_INSTRUCTIONS = loadServerInstructions();
+const WORKFLOW_PROMPT = readWorkflowPrompt();
 const DEFAULT_PACKAGE_READ_TIMEOUT_MS = 2000;
 
 export interface RunDependencies {
@@ -126,18 +127,35 @@ const defaultCreateServer = (name: string, version: string): ServerLike => {
   registerInstructionsResource(server);
 
   server.registerPrompt(
-    'mcp-workflow-audit',
+    'get-help',
     {
-      description: 'Audit an MCP server codebase for protocol compliance',
+      description: 'Get usage instructions for this server',
     },
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     (_request) => ({
       messages: [
         {
           role: 'user',
           content: {
             type: 'text',
-            text: readWorkflowPrompt(),
+            text: SERVER_INSTRUCTIONS,
+          },
+        },
+      ],
+    })
+  );
+
+  server.registerPrompt(
+    'mcp-workflow-audit',
+    {
+      description: 'Audit an MCP server codebase for protocol compliance',
+    },
+    (_request) => ({
+      messages: [
+        {
+          role: 'user',
+          content: {
+            type: 'text',
+            text: WORKFLOW_PROMPT,
           },
         },
       ],

@@ -1,6 +1,6 @@
-# ThinkSeq MCP Server Instructions
+# ThinkSeq Instructions
 
-> **Guidance for the Agent:** These instructions are available as a resource (`internal://instructions`). Load them when you are confused about tool usage.
+> **Guidance for the Agent:** These instructions are available as a resource (`internal://instructions`).
 
 ## 1. Core Capability
 
@@ -26,6 +26,8 @@ _Follow this order; do not guess indices._
    > **Constraint:** Never guess `revisesThought`; always pick from `revisableThoughts`.
 
 ## 3. Tool Nuances & "Gotchas"
+
+_Do NOT repeat the JSON Schema. Focus on behavior._
 
 - **`thinkseq`**:
   - **Side Effects:** Mutates in-memory thought history (write operation).
