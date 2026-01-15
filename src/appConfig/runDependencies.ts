@@ -98,19 +98,28 @@ export interface ResolvedRunDependencies {
   now: () => number;
 }
 
+function buildServerConfig(): {
+  instructions: string;
+  capabilities: {
+    logging: Record<string, never>;
+    tools: { listChanged: boolean };
+    resources: { subscribe: boolean; listChanged: boolean };
+    prompts: { listChanged: boolean };
+  };
+} {
+  return {
+    instructions: SERVER_INSTRUCTIONS,
+    capabilities: {
+      logging: {},
+      tools: { listChanged: true },
+      resources: { subscribe: false, listChanged: false },
+      prompts: { listChanged: false },
+    },
+  };
+}
+
 const defaultCreateServer = (name: string, version: string): ServerLike => {
-  const server = new McpServer(
-    { name, version },
-    {
-      instructions: SERVER_INSTRUCTIONS,
-      capabilities: {
-        logging: {},
-        tools: { listChanged: true },
-        resources: { subscribe: false, listChanged: false },
-        prompts: { listChanged: false },
-      },
-    }
-  );
+  const server = new McpServer({ name, version }, buildServerConfig());
   registerInstructionsResource(server);
 
   server.registerPrompt(

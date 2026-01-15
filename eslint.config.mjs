@@ -187,6 +187,26 @@ export default defineConfig(
           minimumDescriptionLength: 10,
         },
       ],
+
+      // Complexity rules (Gate 3: Complexity & Structure)
+      'complexity': ['error', { max: 10 }],
+      'max-lines-per-function': [
+        'error',
+        {
+          max: 30,
+          skipBlankLines: true,
+          skipComments: true,
+        },
+      ],
+      'max-depth': ['error', 3],
+      'max-lines': [
+        'error',
+        {
+          max: 250,
+          skipBlankLines: true,
+          skipComments: true,
+        },
+      ],
     },
   },
 

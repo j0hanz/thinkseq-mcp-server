@@ -101,6 +101,63 @@ function isSchemaError(error: unknown): boolean {
   return error instanceof Error && error.name === 'ZodError';
 }
 
+function wrapSendForInitTracking(
+  transport: StdioMessageTransportLike,
+  state: { sawInitialize: boolean; pendingInitIds: Set<string> }
+): void {
+  if (!transport.send) return;
+  const originalSend = transport.send.bind(transport);
+  transport.send = (message: unknown) => {
+    trackInitializeResponse(message, state);
+    return originalSend(message);
+  };
+}
+
+function trackInitializeResponse(
+  message: unknown,
+  state: { sawInitialize: boolean; pendingInitIds: Set<string> }
+): void {
+  try {
+    const response = parseJsonRpcResponse(message);
+    if (!response) return;
+    const key = getIdKey(response.id);
+    if (!state.pendingInitIds.has(key)) return;
+    state.pendingInitIds.delete(key);
+    if (response.error === undefined) {
+      state.sawInitialize = true;
+    }
+  } catch {
+    // Ignore send inspection errors.
+  }
+}
+
+function handleInitializeMethod(
+  methodMessage: JsonRpcMethodMessage & { hasId: true },
+  state: { sawInitialize: boolean; pendingInitIds: Set<string> },
+  originalOnMessage: (message: unknown, extra?: unknown) => void,
+  message: unknown,
+  extra?: unknown
+): boolean {
+  state.pendingInitIds.add(getIdKey(methodMessage.id));
+  originalOnMessage(message, extra);
+  return true;
+}
+
+function handleNonInitializedRequest(
+  methodMessage: JsonRpcMethodMessage,
+  transport: StdioMessageTransportLike
+): boolean {
+  if (methodMessage.hasId) {
+    sendError(
+      transport,
+      ErrorCode.InvalidRequest,
+      INIT_FIRST_ERROR_MESSAGE,
+      methodMessage.id
+    );
+  }
+  return true;
+}
+
 export function installStdioInitializationGuards(transport: unknown): void {
   if (!isStdioMessageTransport(transport)) return;
 
@@ -112,54 +169,24 @@ export function installStdioInitializationGuards(transport: unknown): void {
     pendingInitIds: new Set<string>(),
   };
 
-  if (transport.send) {
-    const originalSend = transport.send.bind(transport);
-    transport.send = (message: unknown) => {
-      try {
-        const response = parseJsonRpcResponse(message);
-        if (response) {
-          const key = getIdKey(response.id);
-          if (state.pendingInitIds.has(key)) {
-            state.pendingInitIds.delete(key);
-            if (response.error === undefined) {
-              state.sawInitialize = true;
-            }
-          }
-        }
-      } catch {
-        // Ignore send inspection errors.
-      }
-      return originalSend(message);
-    };
-  }
+  wrapSendForInitTracking(transport, state);
 
   transport.onmessage = (message: unknown, extra?: unknown) => {
     const methodMessage = parseJsonRpcMethodMessage(message);
-    if (methodMessage) {
-      if (methodMessage.method === 'initialize') {
-        if (!methodMessage.hasId) {
-          // initialize must be a request (not a notification).
-          return;
-        }
-        // DELEGATION: We intentionally skip manual protocolVersion checks here and
-        // let the SDK handle version negotiation. This prevents this guard from
-        // becoming a maintenance burden or rejecting valid newer versions.
-        state.pendingInitIds.add(getIdKey(methodMessage.id));
-        originalOnMessage(message, extra);
-        return;
-      }
+    if (!methodMessage) {
+      originalOnMessage(message, extra);
+      return;
+    }
 
-      if (!state.sawInitialize) {
-        if (methodMessage.hasId) {
-          sendError(
-            transport,
-            ErrorCode.InvalidRequest,
-            INIT_FIRST_ERROR_MESSAGE,
-            methodMessage.id
-          );
-        }
-        return;
-      }
+    if (methodMessage.method === 'initialize') {
+      if (!methodMessage.hasId) return;
+      handleInitializeMethod(methodMessage, state, originalOnMessage, message, extra);
+      return;
+    }
+
+    if (!state.sawInitialize) {
+      handleNonInitializedRequest(methodMessage, transport);
+      return;
     }
 
     originalOnMessage(message, extra);

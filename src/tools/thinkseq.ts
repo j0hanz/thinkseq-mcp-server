@@ -159,6 +159,75 @@ async function safeSendNotification(
   }
 }
 
+function normalizeThoughtData(input: ThinkSeqInput): ThoughtData {
+  return {
+    thought: input.thought,
+    ...(input.totalThoughts !== undefined && {
+      totalThoughts: input.totalThoughts,
+    }),
+    ...(input.revisesThought !== undefined && {
+      revisesThought: input.revisesThought,
+    }),
+  };
+}
+
+async function processThoughtWithTiming(
+  engine: EngineLike,
+  normalized: ThoughtData,
+  extra: ToolExtra | undefined,
+  includeTextContent: boolean
+): Promise<ToolResponse> {
+  publishToolStart();
+  await sendProgress(extra, 0, 'started');
+  const start = performance.now();
+
+  try {
+    const result = await engine.processThought(normalized);
+    const durationMs = getDurationMs(start);
+    handleThoughtResult(result, durationMs, extra);
+    return buildToolResponse(result, { includeTextContent });
+  } catch (err) {
+    return handleThoughtError(err, start, extra, includeTextContent);
+  }
+}
+
+function handleThoughtResult(
+  result: ProcessResult,
+  durationMs: number,
+  extra: ToolExtra | undefined
+): void {
+  if (result.ok) {
+    publishToolEnd({ ok: true, durationMs });
+    void sendProgress(extra, result.result.progress, 'completed');
+  } else {
+    publishToolEnd({
+      ok: false,
+      errorCode: result.error.code,
+      errorMessage: result.error.message,
+      durationMs,
+    });
+    void sendProgress(extra, 1, 'failed');
+  }
+}
+
+function handleThoughtError(
+  err: unknown,
+  start: number,
+  extra: ToolExtra | undefined,
+  includeTextContent: boolean
+): ToolResponse {
+  const errorMessage = getErrorMessage(err);
+  const durationMs = getDurationMs(start);
+  publishToolEnd({
+    ok: false,
+    errorCode: 'E_THINK',
+    errorMessage,
+    durationMs,
+  });
+  void sendProgress(extra, 1, 'failed');
+  return buildErrorResponse('E_THINK', errorMessage, includeTextContent);
+}
+
 async function handleThinkSeq(
   engine: EngineLike,
   input: ThinkSeqInput,
@@ -170,46 +239,8 @@ async function handleThinkSeq(
 
   return runWithContext(async () => {
     const includeTextContent = resolveIncludeTextContent();
-    const normalized: ThoughtData = {
-      thought: input.thought,
-      ...(input.totalThoughts !== undefined && {
-        totalThoughts: input.totalThoughts,
-      }),
-      ...(input.revisesThought !== undefined && {
-        revisesThought: input.revisesThought,
-      }),
-    };
-    publishToolStart();
-    await sendProgress(extra, 0, 'started');
-    const start = performance.now();
-    try {
-      const result = await engine.processThought(normalized);
-      const durationMs = getDurationMs(start);
-      if (result.ok) {
-        publishToolEnd({ ok: true, durationMs });
-        await sendProgress(extra, result.result.progress, 'completed');
-      } else {
-        publishToolEnd({
-          ok: false,
-          errorCode: result.error.code,
-          errorMessage: result.error.message,
-          durationMs,
-        });
-        await sendProgress(extra, 1, 'failed');
-      }
-      return buildToolResponse(result, { includeTextContent });
-    } catch (err) {
-      const errorMessage = getErrorMessage(err);
-      const durationMs = getDurationMs(start);
-      publishToolEnd({
-        ok: false,
-        errorCode: 'E_THINK',
-        errorMessage,
-        durationMs,
-      });
-      await sendProgress(extra, 1, 'failed');
-      return buildErrorResponse('E_THINK', errorMessage, includeTextContent);
-    }
+    const normalized = normalizeThoughtData(input);
+    return processThoughtWithTiming(engine, normalized, extra, includeTextContent);
   }, context);
 }
 
