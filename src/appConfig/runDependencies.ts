@@ -122,13 +122,30 @@ const defaultConnectServer = async (
   return transport;
 };
 
-export function resolveRunDependencies(
+function resolveSystemDeps(
   deps: RunDependencies
-): ResolvedRunDependencies {
+): Pick<
+  ResolvedRunDependencies,
+  'processLike' | 'packageReadTimeoutMs' | 'now' | 'shutdownTimeoutMs'
+> {
   return {
     processLike: deps.processLike ?? process,
     packageReadTimeoutMs:
       deps.packageReadTimeoutMs ?? DEFAULT_PACKAGE_READ_TIMEOUT_MS,
+    now: deps.now ?? Date.now,
+    ...(deps.shutdownTimeoutMs !== undefined
+      ? { shutdownTimeoutMs: deps.shutdownTimeoutMs }
+      : {}),
+  };
+}
+
+function resolveAppDeps(
+  deps: RunDependencies
+): Omit<
+  ResolvedRunDependencies,
+  'processLike' | 'packageReadTimeoutMs' | 'now' | 'shutdownTimeoutMs'
+> {
+  return {
     readPackageJson: deps.readPackageJson ?? readSelfPackageJson,
     publishLifecycleEvent: deps.publishLifecycleEvent ?? publishLifecycleEvent,
     createServer: deps.createServer ?? defaultCreateServer,
@@ -137,10 +154,15 @@ export function resolveRunDependencies(
     engineFactory: deps.engineFactory ?? (() => new ThinkingEngine()),
     installShutdownHandlers:
       deps.installShutdownHandlers ?? installShutdownHandlers,
-    now: deps.now ?? Date.now,
-    ...(deps.shutdownTimeoutMs !== undefined
-      ? { shutdownTimeoutMs: deps.shutdownTimeoutMs }
-      : {}),
+  };
+}
+
+export function resolveRunDependencies(
+  deps: RunDependencies
+): ResolvedRunDependencies {
+  return {
+    ...resolveSystemDeps(deps),
+    ...resolveAppDeps(deps),
   };
 }
 

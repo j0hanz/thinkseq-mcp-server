@@ -20,15 +20,9 @@ import { ThinkSeqOutputSchema } from '../schemas/outputs.js';
 function resolveIncludeTextContent(): boolean {
   const raw = process.env.THINKSEQ_INCLUDE_TEXT_CONTENT;
   if (raw === undefined) return true;
-  switch (raw.trim().toLowerCase()) {
-    case '0':
-    case 'false':
-    case 'no':
-    case 'off':
-      return false;
-    default:
-      return true;
-  }
+  const normalized = raw.trim().toLowerCase();
+  const falsyValues = new Set(['0', 'false', 'no', 'off']);
+  return !falsyValues.has(normalized);
 }
 
 const THINKSEQ_TOOL_DEFINITION = {
@@ -137,9 +131,18 @@ async function sendProgress(
   progress: number,
   message?: string
 ): Promise<void> {
-  if (!extra) return;
-  const progressToken = extra._meta?.progressToken;
-  if (progressToken === undefined) return;
+  const progressToken = extra?._meta?.progressToken;
+  if (!extra || progressToken === undefined) return;
+
+  await safeSendNotification(extra, progressToken, progress, message);
+}
+
+async function safeSendNotification(
+  extra: ToolExtra,
+  progressToken: string | number,
+  progress: number,
+  message?: string
+): Promise<void> {
   try {
     await extra.sendNotification({
       method: 'notifications/progress',
@@ -147,11 +150,11 @@ async function sendProgress(
         progressToken,
         progress,
         total: 1,
-        ...(message ? { message } : {}),
+        ...(message && { message }),
       },
     });
   } catch {
-    return;
+    // Ignore progress errors
   }
 }
 

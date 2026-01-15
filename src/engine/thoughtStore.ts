@@ -70,19 +70,25 @@ export class ThoughtStore {
     let low = 0;
     let high = activeThoughtNumbers.length;
     while (low < high) {
-      const mid = Math.floor((low + high) / 2);
+      const mid = (low + high) >>> 1;
       const midValue = activeThoughtNumbers[mid];
+
       if (midValue === undefined) {
         return -1;
       }
+
       if (midValue < thoughtNumber) {
         low = mid + 1;
       } else {
         high = mid;
       }
     }
-    const foundValue = activeThoughtNumbers[low];
-    if (foundValue === thoughtNumber) return low;
+    if (
+      low < activeThoughtNumbers.length &&
+      activeThoughtNumbers[low] === thoughtNumber
+    ) {
+      return low;
+    }
     return -1;
   }
 
@@ -158,20 +164,13 @@ export class ThoughtStore {
   #removeOldest(count: number, options: { forceCompact?: boolean } = {}): void {
     const totalLength = this.getTotalLength();
     if (count <= 0 || totalLength === 0) return;
+
     const actual = Math.min(count, totalLength);
     const start = this.#headIndex;
     const end = start + actual;
-    const forceCompact = options.forceCompact ?? false;
-    let removedBytes = 0;
-    let removedMaxThoughtNumber = -1;
-    for (let index = start; index < end; index += 1) {
-      const thought = this.#thoughts[index];
-      if (!thought) continue;
-      removedBytes += this.#estimateThoughtBytes(thought);
-      this.#thoughtIndex.delete(thought.thoughtNumber);
-      removedMaxThoughtNumber = thought.thoughtNumber;
-    }
-    this.#estimatedBytes -= removedBytes;
+
+    const removedMaxThoughtNumber = this.#evictRange(start, end);
+
     this.#headIndex = end;
     if (this.getTotalLength() === 0) {
       this.#resetThoughts();
@@ -180,7 +179,25 @@ export class ThoughtStore {
     if (removedMaxThoughtNumber >= 0) {
       this.#dropActiveThoughtsUpTo(removedMaxThoughtNumber);
     }
-    this.#compactIfNeeded(forceCompact);
+
+    this.#compactIfNeeded(options.forceCompact);
+  }
+
+  #evictRange(start: number, end: number): number {
+    let removedBytes = 0;
+    let maxThoughtNumber = -1;
+
+    for (let index = start; index < end; index += 1) {
+      const thought = this.#thoughts[index];
+      if (!thought) continue;
+
+      removedBytes += this.#estimateThoughtBytes(thought);
+      this.#thoughtIndex.delete(thought.thoughtNumber);
+      maxThoughtNumber = thought.thoughtNumber;
+    }
+
+    this.#estimatedBytes -= removedBytes;
+    return maxThoughtNumber;
   }
 
   #compactIfNeeded(force = false): void {
@@ -189,15 +206,19 @@ export class ThoughtStore {
       this.#resetThoughts();
       return;
     }
-    if (
-      !force &&
-      this.#headIndex < COMPACT_THRESHOLD &&
-      this.#headIndex < this.#thoughts.length * COMPACT_RATIO
-    ) {
+    if (!force && !this.#shouldCompact()) {
       return;
     }
+
     this.#thoughts = this.#thoughts.slice(this.#headIndex);
     this.#headIndex = 0;
+  }
+
+  #shouldCompact(): boolean {
+    return (
+      this.#headIndex >= COMPACT_THRESHOLD ||
+      this.#headIndex >= this.#thoughts.length * COMPACT_RATIO
+    );
   }
 
   #resetThoughts(): void {
