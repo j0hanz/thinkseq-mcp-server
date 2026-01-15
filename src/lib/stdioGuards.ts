@@ -180,7 +180,13 @@ export function installStdioInitializationGuards(transport: unknown): void {
 
     if (methodMessage.method === 'initialize') {
       if (!methodMessage.hasId) return;
-      handleInitializeMethod(methodMessage, state, originalOnMessage, message, extra);
+      handleInitializeMethod(
+        methodMessage,
+        state,
+        originalOnMessage,
+        message,
+        extra
+      );
       return;
     }
 

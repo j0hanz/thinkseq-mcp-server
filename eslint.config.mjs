@@ -189,7 +189,7 @@ export default defineConfig(
       ],
 
       // Complexity rules (Gate 3: Complexity & Structure)
-      'complexity': ['error', { max: 10 }],
+      complexity: ['error', { max: 10 }],
       'max-lines-per-function': [
         'error',
         {

@@ -92,7 +92,7 @@ export class ThoughtStore {
     return -1;
   }
 
-  supersedeFrom(targetNumber: number, supersededBy: number): number[] {
+  supersedeFrom(targetNumber: number, supersededBy: number): readonly number[] {
     const startIndex = this.#findActiveThoughtIndex(targetNumber);
     if (startIndex < 0) return [];
     const supersedes: number[] = [];

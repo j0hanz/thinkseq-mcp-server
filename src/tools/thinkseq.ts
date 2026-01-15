@@ -240,7 +240,12 @@ async function handleThinkSeq(
   return runWithContext(async () => {
     const includeTextContent = resolveIncludeTextContent();
     const normalized = normalizeThoughtData(input);
-    return processThoughtWithTiming(engine, normalized, extra, includeTextContent);
+    return processThoughtWithTiming(
+      engine,
+      normalized,
+      extra,
+      includeTextContent
+    );
   }, context);
 }
 

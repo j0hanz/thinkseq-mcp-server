@@ -4,9 +4,10 @@ import type {
   StoredThought,
 } from '../lib/types.js';
 
-function selectRecentThoughts(
-  activeThoughts: readonly StoredThought[]
-): { recent: StoredThought[]; stepIndexes: number[] } {
+function selectRecentThoughts(activeThoughts: readonly StoredThought[]): {
+  recent: StoredThought[];
+  stepIndexes: number[];
+} {
   if (activeThoughts.length <= 5) {
     const recent = activeThoughts.slice();
     const stepIndexes = recent.map((_, index) => index + 1);
@@ -25,7 +26,8 @@ function selectRecentThoughts(
 }
 
 function formatThoughtPreview(thought: string): string {
-  return thought.length > 100 ? `${thought.slice(0, 100)}...` : thought;
+  if (thought.length <= 100) return thought;
+  return `${thought.slice(0, 100)}...`;
 }
 
 export function buildContextSummary(
