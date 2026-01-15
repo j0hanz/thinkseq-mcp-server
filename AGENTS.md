@@ -1,84 +1,70 @@
 # AGENTS.md
 
-## Project Overview
+> **Purpose:** Context and strict guidelines for AI agents working in this repository.
 
-- This repository builds and publishes an MCP (Model Context Protocol) server + CLI named `thinkseq`.
-- Tech stack: Node.js (ESM), TypeScript, `@modelcontextprotocol/sdk`, Zod.
-- Primary entrypoint: `src/index.ts` (CLI + stdio server wiring via `run()` from `src/app.ts`).
-- Package output: `dist/` (published entry: `dist/index.js`, types: `dist/index.d.ts`).
+## 1. Project Context
 
-## Repo Map / Structure
+- **Domain:** MCP (Model Context Protocol) stdio server that exposes a single `thinkseq` tool for structured, sequential thinking with revision (destructive rewind) support.
+- **Tech Stack:**
+  - **Language:** TypeScript (compiler: TypeScript 5.9.3)
+  - **Runtime:** Node.js `>=20.0.0` (ESM; `"type": "module"`)
+  - **Key Libraries:** `@modelcontextprotocol/sdk`, `zod`
+- **Architecture:** Layered modules (CLI + app wiring → engine core → lib utilities → zod schemas → MCP tool registration).
 
-- `src/`: TypeScript source for the MCP server and tool implementation.
-  - `src/index.ts`: CLI entrypoint (has a `#!/usr/bin/env node` shebang).
-  - `src/tools/`: MCP tool registrations (e.g. `thinkseq`).
-  - `src/schemas/`: Zod input/output schemas.
-  - `src/lib/`: CLI parsing, protocol guards, stdio helpers, diagnostics, errors.
-  - `src/engine/`: thought storage, revision logic, queries.
-  - `src/instructions.md`: tool usage instructions copied into `dist/` during build.
-- `tests/`: Node.js test suite (`tests/*.test.ts`).
-- `benchmark/`: benchmarks (e.g. `benchmark/engine.bench.ts`).
-- `docs/`: repo assets (e.g. `docs/logo.png`).
-- `scripts/`: automation helpers (e.g. `scripts/Quality-Gates.ps1`).
-- `metrics/`: metrics output location referenced by scripts.
-- `dist/`: build output (generated).
+## 2. Repository Map (High-Level Only)
 
-## Setup & Environment
+- `src/`: Implementation (CLI entrypoint, MCP wiring, engine, schemas, tool registration).
+- `tests/`: Node.js test runner tests (`node:test`) for behavior + characterization.
+- `.github/workflows/`: CI/CD (publishing workflow).
+- `benchmark/`: Benchmarks.
+- `docs/`: Assets (e.g., logo).
+- `scripts/`, `metrics/`: Quality gate helpers and metric snapshots.
 
-- Node.js: `>=20.0.0` (see `package.json` `engines.node`).
-- Package manager: npm (this repo includes `package-lock.json`; CI uses `npm ci`).
-- Install dependencies:
-  - Clean install (CI-like): `npm ci`
-  - Local dev install: `npm install`
+> Note: Ignore `dist/`, `node_modules/` for source edits.
 
-## Development Workflow
+## 3. Operational Commands
 
-- Dev (watch): `npm run dev` (runs `tsx watch src/index.ts`).
-- Build: `npm run build`
-  - Compiles with `tsc -p tsconfig.build.json`.
-  - Copies `src/instructions.md` to `dist/instructions.md`.
-- Start (built output): `npm start` (runs `node dist/index.js`).
-- CLI usage (from README): `thinkseq --max-thoughts 500 --max-memory-mb 100`
+- **Environment:** Node.js `>=20`.
+- **Install:** `npm ci`
+- **Dev Server:** `npm run dev` (watches `src/index.ts` via `tsx`)
+- **Test:** `npm test` (runs `node --import tsx/esm --test tests/*.test.ts`)
+- **Build:** `npm run build` (emits `dist/`)
 
-## Testing
+Useful (also verified in `package.json`):
 
-- All tests: `npm test` (runs Node’s test runner over `tests/*.test.ts` via `tsx/esm`).
-- CI-style test run: `npm run test:ci` (build then test).
-- Coverage (Node experimental): `npm run test:coverage`.
-- Test location/pattern: `tests/*.test.ts`.
+- **Lint:** `npm run lint`
+- **Type-check:** `npm run type-check`
+- **Start built output:** `npm start`
 
-## Code Style & Conventions
+## 4. Coding Standards (Style & Patterns)
 
-- Language: TypeScript (tsconfig target `ES2022`, module `NodeNext`, ESM package).
-- Imports:
-  - Local imports use `.js` extensions (NodeNext runtime resolution).
-  - Prefer type-only imports (see ESLint rules).
-- Lint: `npm run lint` (ESLint flat config in `eslint.config.mjs`).
-- Format:
-  - Write: `npm run format`
-  - Check: `npm run format:check`
-- Type-check (no emit): `npm run type-check`.
-- Notable lint rules enforced:
-  - `unused-imports/no-unused-imports` (error)
-  - Consistent type imports/exports
-  - Explicit return types on functions
-  - `@typescript-eslint/no-explicit-any` (error)
+- **Module system:** ESM + NodeNext resolution. Local imports use `.js` extensions (even in TypeScript sources).
+- **Typing:** Strict TypeScript (`strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noImplicitOverride`).
+- **Naming:** `camelCase` for vars/functions, `PascalCase` for types/classes.
+- **Exports:** Prefer named exports; avoid default exports.
+- **Lint rules to respect:** No `any`; explicit return types on exported functions; prefer `import { type X }` for type-only.
+- **Common patterns in code:**
+  - Small pure helpers + early returns.
+  - Conditional object spread (`...(cond && { key: value })`).
+  - Private class fields via `#field`.
 
-## Build / Release
+## 5. Agent Behavioral Rules (The “Do Nots”)
 
-- Build output directory: `dist/`.
-- Release publish workflow:
-  - GitHub Actions workflow `.github/workflows/publish.yml` runs on GitHub Release `published`.
-  - Steps include: `npm ci`, `npm run lint`, `npm run type-check`, `npm run test`, `npm run test:coverage`, then `npm run build`, then `npm publish --access public`.
+- **Prohibited:** Do not use `any`.
+- **Prohibited:** Do not remove `.js` from local import specifiers.
+- **Prohibited:** Do not introduce default exports.
+- **Prohibited:** Do not write non-MCP output to stdout in stdio mode (use `console.error` for logs).
+- **Prohibited:** Do not edit build artifacts (`dist/`) or dependencies (`node_modules/`).
+- **Lockfiles:** Do not edit `package-lock.json` manually.
+- **Secrets:** Never hardcode secrets or echo `.env` values.
+- **Schema strictness:** Preserve Zod strictness (unknown keys should be rejected where schemas use `z.strictObject`).
 
-## Security & Safety
+## 6. Testing Strategy
 
-- No environment variables are required for basic operation (per README).
-- This server runs over stdio; avoid writing non-protocol output to stdout during runtime. Prefer `console.error()` for diagnostics.
-- `scripts/Quality-Gates.ps1` includes optional security checks via `npm audit` and dependency health via `npm outdated`.
+- **Framework:** Node’s built-in test runner (`node:test`) + `node:assert/strict`.
+- **Approach:** Unit + characterization tests that lock down output shapes (important for MCP tool output stability).
 
-## Pull Request / Commit Guidelines
+## 7. Evolution & Maintenance
 
-- Pre-publish checks (mirrors `prepublishOnly`): `npm run lint && npm run type-check && npm run build`.
-- CI workflow additionally runs `npm run test` and `npm run test:coverage` on publish.
-- Commit message format: not specified in repo files.
+- **Update Rule:** If you introduce new scripts, env vars, or conventions, propose an update to this file.
+- **Common Pitfalls (verified):** `.github/workflows/publish.yml` runs `npm run maintainability` and `npm run duplication`, but these scripts are not present in `package.json`.
