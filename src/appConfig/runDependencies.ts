@@ -103,7 +103,11 @@ const defaultCreateServer = (name: string, version: string): ServerLike => {
     { name, version },
     {
       instructions: SERVER_INSTRUCTIONS,
-      capabilities: { logging: {}, tools: { listChanged: true } },
+      capabilities: {
+        logging: {},
+        tools: { listChanged: true },
+        resources: { subscribe: false, listChanged: false },
+      },
     }
   );
   registerInstructionsResource(server);

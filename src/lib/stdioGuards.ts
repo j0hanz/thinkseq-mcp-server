@@ -10,12 +10,6 @@ type JsonRpcId = number | string | null;
 
 const INIT_FIRST_ERROR_MESSAGE = 'initialize must be the first request';
 
-const SERVER_SUPPORTED_PROTOCOL_VERSIONS = new Set<string>([
-  // Keep in sync with stdio transport capabilities (no JSON-RPC batching).
-  '2025-06-18',
-  '2025-11-25',
-]);
-
 function isStdioMessageTransport(
   value: unknown
 ): value is StdioMessageTransportLike {
@@ -107,22 +101,6 @@ function isSchemaError(error: unknown): boolean {
   return error instanceof Error && error.name === 'ZodError';
 }
 
-function getInitializeProtocolVersion(message: unknown): unknown {
-  if (!isRecord(message)) return undefined;
-  const { params } = message;
-  if (!isRecord(params)) return undefined;
-  const { protocolVersion } = params;
-  return protocolVersion;
-}
-
-function getProtocolVersionError(protocolVersion: unknown): string | undefined {
-  if (typeof protocolVersion !== 'string') {
-    return 'protocolVersion must be a string';
-  }
-  if (SERVER_SUPPORTED_PROTOCOL_VERSIONS.has(protocolVersion)) return undefined;
-  return `Unsupported protocolVersion: ${protocolVersion}`;
-}
-
 export function installStdioInitializationGuards(transport: unknown): void {
   if (!isStdioMessageTransport(transport)) return;
 
@@ -163,18 +141,9 @@ export function installStdioInitializationGuards(transport: unknown): void {
           // initialize must be a request (not a notification).
           return;
         }
-        const error = getProtocolVersionError(
-          getInitializeProtocolVersion(message)
-        );
-        if (error) {
-          sendError(
-            transport,
-            ErrorCode.InvalidRequest,
-            error,
-            methodMessage.id
-          );
-          return;
-        }
+        // DELEGATION: We intentionally skip manual protocolVersion checks here and
+        // let the SDK handle version negotiation. This prevents this guard from
+        // becoming a maintenance burden or rejecting valid newer versions.
         state.pendingInitIds.add(getIdKey(methodMessage.id));
         originalOnMessage(message, extra);
         return;

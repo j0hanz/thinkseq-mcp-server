@@ -65,7 +65,7 @@ void describe('stdioGuards.installStdioInitializationGuards', () => {
     assert.equal(transport.seen.length, 0);
   });
 
-  void it('rejects initialize when protocolVersion is missing', async () => {
+  void it('passes initialize when protocolVersion is missing (delegates to SDK)', async () => {
     const transport = createTransport();
 
     installStdioInitializationGuards(transport);
@@ -80,11 +80,11 @@ void describe('stdioGuards.installStdioInitializationGuards', () => {
 
     await Promise.resolve();
 
-    assert.equal(transport.sent.length, 1);
-    assert.equal(transport.seen.length, 0);
+    assert.equal(transport.sent.length, 0);
+    assert.equal(transport.seen.length, 1);
   });
 
-  void it('rejects initialize when protocolVersion is unsupported', async () => {
+  void it('passes initialize when protocolVersion is unsupported (delegates to SDK)', async () => {
     const transport = createTransport();
 
     installStdioInitializationGuards(transport);
@@ -99,8 +99,8 @@ void describe('stdioGuards.installStdioInitializationGuards', () => {
 
     await Promise.resolve();
 
-    assert.equal(transport.sent.length, 1);
-    assert.equal(transport.seen.length, 0);
+    assert.equal(transport.sent.length, 0);
+    assert.equal(transport.seen.length, 1);
   });
 
   void it('allows requests after a successful initialize response', async () => {
