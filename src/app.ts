@@ -5,7 +5,7 @@ import {
   resolveRunDependencies,
   type RunDependencies,
 } from './appConfig.js';
-import { installMcpLogging } from './lib/mcpLogging.js';
+import { installConsoleBridge, installMcpLogging } from './lib/mcpLogging.js';
 
 interface ProcessErrorHandlerDeps {
   processLike?: ProcessLike;
@@ -53,6 +53,7 @@ export async function run(deps: RunDependencies = {}): Promise<void> {
 
   const server = resolved.createServer(name, version);
   installMcpLogging(server);
+  installConsoleBridge(server);
 
   resolved.publishLifecycleEvent({
     type: 'lifecycle.started',
