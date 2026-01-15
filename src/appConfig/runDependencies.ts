@@ -1,6 +1,9 @@
 import { readFileSync } from 'node:fs';
 
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import {
+  McpServer,
+  ResourceTemplate,
+} from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 
 import { ThinkingEngine } from '../engine.js';
@@ -23,18 +26,39 @@ import type {
   TransportLike,
 } from './types.js';
 
-function loadServerInstructions(): string {
-  const fallback =
-    'ThinkSeq is a tool for structured, sequential thinking with revision support.';
+const INSTRUCTIONS_URL = new URL('../instructions.md', import.meta.url);
+const INSTRUCTIONS_FALLBACK =
+  'ThinkSeq is a tool for structured, sequential thinking with revision support.';
+
+function readInstructionsText(): string {
   try {
-    const raw = readFileSync(new URL('../instructions.md', import.meta.url), {
-      encoding: 'utf8',
-    });
-    const trimmed = raw.trim();
-    return trimmed.length > 0 ? trimmed : fallback;
+    return readFileSync(INSTRUCTIONS_URL, { encoding: 'utf8' });
   } catch {
-    return fallback;
+    return INSTRUCTIONS_FALLBACK;
   }
+}
+
+function loadServerInstructions(): string {
+  const raw = readInstructionsText();
+  const trimmed = raw.trim();
+  return trimmed.length > 0 ? trimmed : INSTRUCTIONS_FALLBACK;
+}
+
+function registerInstructionsResource(server: ServerLike): void {
+  server.registerResource(
+    'instructions',
+    new ResourceTemplate('internal://instructions', { list: undefined }),
+    { title: 'Instructions', mimeType: 'text/markdown' },
+    (uri: URL) => ({
+      contents: [
+        {
+          uri: uri.href,
+          text: readInstructionsText(),
+          mimeType: 'text/markdown',
+        },
+      ],
+    })
+  );
 }
 
 const SERVER_INSTRUCTIONS = loadServerInstructions();
@@ -75,13 +99,15 @@ export interface ResolvedRunDependencies {
 }
 
 const defaultCreateServer = (name: string, version: string): ServerLike => {
-  return new McpServer(
+  const server = new McpServer(
     { name, version },
     {
       instructions: SERVER_INSTRUCTIONS,
       capabilities: { logging: {}, tools: { listChanged: true } },
     }
   );
+  registerInstructionsResource(server);
+  return server;
 };
 
 const defaultConnectServer = async (
