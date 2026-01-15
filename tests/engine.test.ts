@@ -354,7 +354,7 @@ void describe('ThinkingEngine.revision', () => {
       revisableThoughts: [3],
       revisableThoughtsTotal: 1,
       context: {
-        recentThoughts: [{ stepIndex: 3, number: 3, preview: 'A revised' }],
+        recentThoughts: [{ stepIndex: 1, number: 3, preview: 'A revised' }],
         revisionInfo: { revises: 1, supersedes: [1, 2], supersedesTotal: 2 },
       },
     });

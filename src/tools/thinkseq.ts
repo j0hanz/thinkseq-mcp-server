@@ -21,9 +21,10 @@ function resolveIncludeTextContent(): boolean {
   const raw = process.env.THINKSEQ_INCLUDE_TEXT_CONTENT;
   if (raw === undefined) return true;
   const normalized = raw.trim().toLowerCase();
-  const falsyValues = new Set(['0', 'false', 'no', 'off']);
-  return !falsyValues.has(normalized);
+  return !FALSY_ENV_VALUES.has(normalized);
 }
+
+const FALSY_ENV_VALUES = new Set(['0', 'false', 'no', 'off']);
 
 const THINKSEQ_TOOL_DEFINITION = {
   title: 'Think Sequentially',
