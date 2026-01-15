@@ -228,7 +228,7 @@ void describe('ThinkingEngine.pruning', () => {
     const engine = new ThinkingEngine({ maxThoughts: 5 });
     const numbers: number[] = [];
 
-    for (let i = 1; i <= 8; i += 1) {
+    const addThought = (i: number) => {
       const result = engine.processThought({
         thought: `t${i}`,
         totalThoughts: 10,
@@ -236,7 +236,16 @@ void describe('ThinkingEngine.pruning', () => {
       assert.ok(result.ok);
       numbers.push(result.result.thoughtNumber);
       assert.strictEqual(result.result.thoughtNumber, i);
-    }
+    };
+
+    addThought(1);
+    addThought(2);
+    addThought(3);
+    addThought(4);
+    addThought(5);
+    addThought(6);
+    addThought(7);
+    addThought(8);
 
     assert.deepStrictEqual(numbers, [1, 2, 3, 4, 5, 6, 7, 8]);
   });

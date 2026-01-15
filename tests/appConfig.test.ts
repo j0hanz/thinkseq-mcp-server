@@ -10,6 +10,7 @@ import {
 import type { ShutdownDependencies } from '../src/appConfig/shutdown.js';
 import type { ServerLike } from '../src/appConfig/types.js';
 import { ThinkingEngine } from '../src/engine.js';
+import { waitFor } from './helpers/async.js';
 
 type ProcessStub = {
   handlers: Map<string, (...args: unknown[]) => void>;
@@ -31,19 +32,6 @@ const createProcessStub = (): ProcessStub => {
       exitCodes.push(code);
     },
   };
-};
-
-const waitFor = async (
-  predicate: () => boolean,
-  timeoutMs = 50
-): Promise<void> => {
-  const start = Date.now();
-  while (!predicate()) {
-    if (Date.now() - start > timeoutMs) {
-      throw new Error('Timed out waiting for condition');
-    }
-    await new Promise((resolve) => setTimeout(resolve, 1));
-  }
 };
 
 void describe('appConfig.resolvePackageIdentity', () => {
