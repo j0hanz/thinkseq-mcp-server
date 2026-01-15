@@ -131,7 +131,7 @@ const defaultCreateServer = (name: string, version: string): ServerLike => {
     {
       description: 'Get usage instructions for this server',
     },
-    (_request) => ({
+    () => ({
       messages: [
         {
           role: 'user',
@@ -149,7 +149,7 @@ const defaultCreateServer = (name: string, version: string): ServerLike => {
     {
       description: 'Audit an MCP server codebase for protocol compliance',
     },
-    (_request) => ({
+    () => ({
       messages: [
         {
           role: 'user',

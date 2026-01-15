@@ -116,7 +116,7 @@ export class ThoughtStore {
   }
 
   getActiveThoughtNumbers(): readonly number[] {
-    return this.#activeThoughtNumbers;
+    return this.#activeThoughtNumbers.slice();
   }
 
   getThoughtByNumber(thoughtNumber: number): StoredThought | undefined {

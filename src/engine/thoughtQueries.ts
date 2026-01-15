@@ -14,8 +14,9 @@ export function buildContextSummary(
     stepIndex: startIndex + index + 1,
     number: thought.thoughtNumber,
     preview:
-      thought.thought.slice(0, 100) +
-      (thought.thought.length > 100 ? '...' : ''),
+      thought.thought.length > 100
+        ? `${thought.thought.slice(0, 100)}...`
+        : thought.thought,
   }));
 
   if (revisionInfo !== undefined) {

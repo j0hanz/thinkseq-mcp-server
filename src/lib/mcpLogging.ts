@@ -84,7 +84,6 @@ export function installMcpLogging(target: LoggingTarget): () => void {
 }
 
 export function installConsoleBridge(target: LoggingTarget): void {
-  // eslint-disable-next-line no-console
   console.log = (...args: unknown[]) => {
     const text = args
       .map((a) => (typeof a === 'string' ? a : JSON.stringify(a)))
