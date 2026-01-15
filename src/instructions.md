@@ -31,7 +31,7 @@ _Do NOT repeat the JSON Schema. Focus on behavior._
 
 - **`thinkseq`**:
   - **Side Effects:** Mutates in-memory thought history (write operation).
-  - **Limits:** `thought` max 5000 chars; `totalThoughts` max 25.
+  - **Limits:** `thought` max 8000 chars; `totalThoughts` max 25.
   - **Revisions:** Revising a thought supersedes that step and all later active steps.
   - **Compatibility:** Set `THINKSEQ_INCLUDE_TEXT_CONTENT=0|false|no|off` to omit the JSON string in `content`.
 

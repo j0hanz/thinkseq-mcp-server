@@ -27,7 +27,7 @@ function resolveIncludeTextContent(): boolean {
 
 const THINKSEQ_TOOL_DEFINITION = {
   title: 'Think Sequentially',
-  description: `Record a concise thinking step (max 5000 chars). Be brief: capture only the essential insight, calculation, or decision.
+  description: `Record a concise thinking step (max 8000 chars). Be brief: capture only the essential insight, calculation, or decision.
 
 REVISION (DESTRUCTIVE REWIND): If you realize an earlier step was wrong, use \`revisesThought\` to correct it.
 Revising a thought will supersede (discard from the active chain) the target thought and all later active thoughts, then continue from the corrected step. Older thoughts remain preserved for audit.

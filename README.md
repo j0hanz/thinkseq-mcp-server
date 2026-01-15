@@ -132,7 +132,7 @@ Record a concise thinking step. Be brief: capture only the essential insight, ca
 
 | Field            | Type   | Required | Description                                                        |
 | :--------------- | :----- | :------: | :----------------------------------------------------------------- |
-| `thought`        | string |   yes    | Current thinking step (1-5000 chars).                              |
+| `thought`        | string |   yes    | Current thinking step (1-8000 chars).                              |
 | `totalThoughts`  | number |    no    | Estimated total thoughts (1-25, default: 3).                       |
 | `revisesThought` | number |    no    | Revise a previous thought by number. Original preserved for audit. |
 
