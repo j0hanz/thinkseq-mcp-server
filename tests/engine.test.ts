@@ -263,6 +263,30 @@ void describe('ThinkingEngine.pruning', () => {
   });
 });
 
+void describe('ThinkingEngine.anchorMode', () => {
+  void it('should show anchor (thought 1) + last 4 when count > 5', () => {
+    const engine = new ThinkingEngine();
+
+    for (let i = 1; i <= 10; i++) {
+      engine.processThought({ thought: `Thought ${i}`, totalThoughts: 20 });
+    }
+
+    const result = engine.processThought({
+      thought: 'Check',
+      totalThoughts: 20,
+    });
+    assert.ok(result.ok);
+    const context = result.result.context.recentThoughts;
+    assert.strictEqual(context.length, 5);
+    assert.strictEqual(context[0].number, 1);
+    assert.strictEqual(context[0].preview, 'Thought 1');
+    assert.strictEqual(context[1].number, 8);
+    assert.strictEqual(context[2].number, 9);
+    assert.strictEqual(context[3].number, 10);
+    assert.strictEqual(context[4].number, 11);
+  });
+});
+
 void describe('ThinkingEngine.revision', () => {
   void it('should revise a previous thought', () => {
     const engine = new ThinkingEngine();
@@ -330,7 +354,7 @@ void describe('ThinkingEngine.revision', () => {
       revisableThoughts: [3],
       revisableThoughtsTotal: 1,
       context: {
-        recentThoughts: [{ stepIndex: 1, number: 3, preview: 'A revised' }],
+        recentThoughts: [{ stepIndex: 3, number: 3, preview: 'A revised' }],
         revisionInfo: { revises: 1, supersedes: [1, 2], supersedesTotal: 2 },
       },
     });

@@ -8,10 +8,19 @@ export function buildContextSummary(
   activeThoughts: readonly StoredThought[],
   revisionInfo?: RevisionInfo
 ): ContextSummary {
-  const recent = activeThoughts.slice(-5);
-  const startIndex = activeThoughts.length - recent.length;
-  const recentThoughts = recent.map((thought, index) => ({
-    stepIndex: startIndex + index + 1,
+  let recent: StoredThought[];
+
+  if (activeThoughts.length > 5) {
+    const anchor = activeThoughts[0];
+    if (!anchor) throw new Error('Invariant violation: anchor thought missing');
+    const tail = activeThoughts.slice(-4);
+    recent = [anchor, ...tail];
+  } else {
+    recent = activeThoughts.slice();
+  }
+
+  const recentThoughts = recent.map((thought) => ({
+    stepIndex: thought.thoughtNumber,
     number: thought.thoughtNumber,
     preview:
       thought.thought.length > 100
