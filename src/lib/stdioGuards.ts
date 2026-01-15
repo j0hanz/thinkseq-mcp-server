@@ -158,20 +158,12 @@ function handleNonInitializedRequest(
   return true;
 }
 
-export function installStdioInitializationGuards(transport: unknown): void {
-  if (!isStdioMessageTransport(transport)) return;
-
-  const originalOnMessage = transport.onmessage;
-  if (!originalOnMessage) return;
-
-  const state = {
-    sawInitialize: false,
-    pendingInitIds: new Set<string>(),
-  };
-
-  wrapSendForInitTracking(transport, state);
-
-  transport.onmessage = (message: unknown, extra?: unknown) => {
+function createInitGuardHandler(
+  state: { sawInitialize: boolean; pendingInitIds: Set<string> },
+  originalOnMessage: (message: unknown, extra?: unknown) => void,
+  transport: StdioMessageTransportLike
+): (message: unknown, extra?: unknown) => void {
+  return (message: unknown, extra?: unknown) => {
     const methodMessage = parseJsonRpcMethodMessage(message);
     if (!methodMessage) {
       originalOnMessage(message, extra);
@@ -197,6 +189,26 @@ export function installStdioInitializationGuards(transport: unknown): void {
 
     originalOnMessage(message, extra);
   };
+}
+
+export function installStdioInitializationGuards(transport: unknown): void {
+  if (!isStdioMessageTransport(transport)) return;
+
+  const originalOnMessage = transport.onmessage;
+  if (!originalOnMessage) return;
+
+  const state = {
+    sawInitialize: false,
+    pendingInitIds: new Set<string>(),
+  };
+
+  wrapSendForInitTracking(transport, state);
+
+  transport.onmessage = createInitGuardHandler(
+    state,
+    originalOnMessage,
+    transport
+  );
 }
 
 export function installStdioInvalidMessageGuards(transport: unknown): void {
