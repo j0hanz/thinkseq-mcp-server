@@ -92,10 +92,15 @@ export class ThoughtStore {
     return -1;
   }
 
-  supersedeFrom(targetNumber: number, supersededBy: number): readonly number[] {
+  supersedeFrom(
+    targetNumber: number,
+    supersededBy: number,
+    maxSupersedes?: number
+  ): { supersedes: number[]; supersedesTotal: number } {
     const startIndex = this.#findActiveThoughtIndex(targetNumber);
-    if (startIndex < 0) return [];
+    if (startIndex < 0) return { supersedes: [], supersedesTotal: 0 };
     const supersedes: number[] = [];
+    let supersedesTotal = 0;
     for (let i = startIndex; i < this.#activeThoughts.length; i += 1) {
       const thought = this.#activeThoughts[i];
       if (!thought) continue;
@@ -103,20 +108,30 @@ export class ThoughtStore {
         thought.isActive = false;
         thought.supersededBy = supersededBy;
       }
-      supersedes.push(thought.thoughtNumber);
+      supersedesTotal += 1;
+      if (maxSupersedes === undefined || supersedes.length < maxSupersedes) {
+        supersedes.push(thought.thoughtNumber);
+      }
     }
     this.#activeThoughts.length = startIndex;
     this.#activeThoughtNumbers.length = startIndex;
     this.#recomputeActiveMaxTotalThoughts();
-    return supersedes;
+    return { supersedes, supersedesTotal };
   }
 
   getActiveThoughts(): readonly StoredThought[] {
     return this.#activeThoughts;
   }
 
-  getActiveThoughtNumbers(): readonly number[] {
-    return this.#activeThoughtNumbers.slice();
+  getActiveThoughtNumbers(max?: number): number[] {
+    if (max === undefined) {
+      return this.#activeThoughtNumbers.slice();
+    }
+    if (max <= 0) return [];
+    if (this.#activeThoughtNumbers.length <= max) {
+      return this.#activeThoughtNumbers.slice();
+    }
+    return this.#activeThoughtNumbers.slice(-max);
   }
 
   getThoughtByNumber(thoughtNumber: number): StoredThought | undefined {

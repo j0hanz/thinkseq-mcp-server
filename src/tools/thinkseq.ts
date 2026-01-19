@@ -178,8 +178,8 @@ async function processThoughtWithTiming(
   includeTextContent: boolean
 ): Promise<ToolResponse> {
   publishToolStart();
-  await sendProgress(extra, 0, 'started');
   const start = performance.now();
+  void sendProgress(extra, 0, 'started');
 
   try {
     const result = await engine.processThought(normalized);

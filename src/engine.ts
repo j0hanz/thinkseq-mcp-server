@@ -76,12 +76,11 @@ export class ThinkingEngine {
     const { numbers, stored } = this.#createStoredThought(input, {
       revisionOf: targetNumber,
     });
-    const supersedesAll = this.#store.supersedeFrom(
+    const { supersedes, supersedesTotal } = this.#store.supersedeFrom(
       targetNumber,
-      numbers.thoughtNumber
+      numbers.thoughtNumber,
+      MAX_SUPERSEDES
     );
-    const supersedesTotal = supersedesAll.length;
-    const supersedes = capArrayStart(supersedesAll, MAX_SUPERSEDES);
 
     this.#hasRevisions = true;
     this.#commitThought(stored);
@@ -139,7 +138,11 @@ export class ThinkingEngine {
 
   #resolveEffectiveTotalThoughts(input: ThoughtData): number {
     if (input.totalThoughts !== undefined) {
-      return input.totalThoughts;
+      return normalizeInt(
+        input.totalThoughts,
+        ThinkingEngine.DEFAULT_TOTAL_THOUGHTS,
+        { min: 1, max: MAX_THOUGHTS_CAP }
+      );
     }
 
     const activeThoughts = this.#store.getActiveThoughts();
@@ -158,10 +161,8 @@ export class ThinkingEngine {
     const activeThoughts = this.#store.getActiveThoughts();
     const context = buildContextSummary(activeThoughts, revisionInfo);
     const isComplete = stored.thoughtNumber >= stored.totalThoughts;
-    const revisableThoughtsAll = this.#store.getActiveThoughtNumbers();
-    const revisableThoughtsTotal = revisableThoughtsAll.length;
-    const revisableThoughts = capArrayEnd(
-      revisableThoughtsAll,
+    const revisableThoughtsTotal = activeThoughts.length;
+    const revisableThoughts = this.#store.getActiveThoughtNumbers(
       MAX_REVISABLE_THOUGHTS
     );
 
@@ -181,14 +182,4 @@ export class ThinkingEngine {
       },
     };
   }
-}
-
-function capArrayStart(values: readonly number[], max: number): number[] {
-  if (values.length <= max) return values.slice();
-  return values.slice(0, max);
-}
-
-function capArrayEnd(values: readonly number[], max: number): number[] {
-  if (values.length <= max) return values.slice();
-  return values.slice(-max);
 }
