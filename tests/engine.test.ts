@@ -209,7 +209,8 @@ void describe('ThinkingEngine.autoNumber', () => {
 
     assert.ok(r3.ok);
     assert.strictEqual(r3.result.thoughtNumber, 3);
-    assert.strictEqual(r3.result.totalThoughts, 3);
+    // v2: totalThoughts is a plan, not auto-bumped by monotonic ID.
+    assert.strictEqual(r3.result.totalThoughts, 2);
     assert.strictEqual(r3.result.progress, 1);
   });
 });
@@ -327,7 +328,8 @@ void describe('ThinkingEngine.revision', () => {
     assert.ok(r3.ok);
     assert.strictEqual(r3.result.thoughtNumber, 3);
     assert.strictEqual(r3.result.totalThoughts, 10);
-    assert.strictEqual(r3.result.progress, 0.3);
+    // v2: progress reflects active path length (1) / totalThoughts (10)
+    assert.strictEqual(r3.result.progress, 0.1);
     assert.strictEqual(r3.result.isComplete, false);
   });
 
@@ -345,9 +347,9 @@ void describe('ThinkingEngine.revision', () => {
     assert.ok(r3.ok);
     assert.deepStrictEqual(r3.result, {
       thoughtNumber: 3,
-      totalThoughts: 3,
-      progress: 1,
-      isComplete: true,
+      totalThoughts: 2,
+      progress: 0.5,
+      isComplete: false,
       thoughtHistoryLength: 3,
       hasRevisions: true,
       activePathLength: 1,

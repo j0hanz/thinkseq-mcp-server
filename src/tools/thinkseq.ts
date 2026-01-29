@@ -19,9 +19,7 @@ import { ThinkSeqOutputSchema } from '../schemas/outputs.js';
 
 function resolveIncludeTextContent(): boolean {
   const raw = process.env.THINKSEQ_INCLUDE_TEXT_CONTENT;
-  if (raw === undefined) return true;
-  const normalized = raw.trim().toLowerCase();
-  return !FALSY_ENV_VALUES.has(normalized);
+  return raw === undefined || !FALSY_ENV_VALUES.has(raw.trim().toLowerCase());
 }
 
 const FALSY_ENV_VALUES = new Set(['0', 'false', 'no', 'off']);
@@ -56,19 +54,11 @@ type ToolResponse =
       isError?: boolean;
     };
 
-function publishToolStart(): void {
-  publishToolEvent({
-    type: 'tool.start',
-    tool: 'thinkseq',
-    ts: Date.now(),
-  });
-}
-
-type ToolEndParams =
-  | { ok: true; durationMs: number }
-  | { ok: false; durationMs: number; errorCode: string; errorMessage: string };
-
-function publishToolEnd(params: ToolEndParams): void {
+function publishToolEnd(
+  params:
+    | { ok: true; durationMs: number }
+    | { ok: false; durationMs: number; errorCode: string; errorMessage: string }
+): void {
   publishToolEvent({
     type: 'tool.end',
     tool: 'thinkseq',
@@ -159,30 +149,52 @@ async function safeSendNotification(
   }
 }
 
-function normalizeThoughtData(input: ThinkSeqInput): ThoughtData {
-  return {
-    thought: input.thought,
-    ...(input.totalThoughts !== undefined && {
-      totalThoughts: input.totalThoughts,
-    }),
-    ...(input.revisesThought !== undefined && {
-      revisesThought: input.revisesThought,
-    }),
-  };
+function resolveSessionId(input: ThinkSeqInput, extra?: ToolExtra): string {
+  const meta = extra?._meta as Record<string, unknown> | undefined;
+  if (!meta) return 'default';
+
+  const candidates = [
+    meta.sessionId,
+    meta.conversationId,
+    meta.threadId,
+    meta.chatId,
+    meta.clientId,
+  ];
+
+  const found = candidates.find(
+    (c): c is string | number =>
+      (typeof c === 'string' && c.trim().length > 0) ||
+      (typeof c === 'number' && Number.isFinite(c))
+  );
+
+  if (typeof found === 'string') return found.trim();
+  if (typeof found === 'number') return String(found);
+  return 'default';
 }
 
 async function processThoughtWithTiming(
   engine: EngineLike,
+  sessionId: string,
   normalized: ThoughtData,
   extra: ToolExtra | undefined,
   includeTextContent: boolean
 ): Promise<ToolResponse> {
-  publishToolStart();
+  publishToolEvent({ type: 'tool.start', tool: 'thinkseq', ts: Date.now() });
   const start = performance.now();
   void sendProgress(extra, 0, 'started');
 
   try {
-    const result = await engine.processThought(normalized);
+    const sessionEngine = engine as {
+      processThoughtWithSession?: (
+        id: string,
+        d: ThoughtData
+      ) => ProcessResult | Promise<ProcessResult>;
+    };
+
+    const result = await (sessionEngine.processThoughtWithSession
+      ? sessionEngine.processThoughtWithSession(sessionId, normalized)
+      : engine.processThought(normalized));
+
     const durationMs = getDurationMs(start);
     handleThoughtResult(result, durationMs, extra);
     return buildToolResponse(result, { includeTextContent });
@@ -239,9 +251,19 @@ async function handleThinkSeq(
 
   return runWithContext(async () => {
     const includeTextContent = resolveIncludeTextContent();
-    const normalized = normalizeThoughtData(input);
+    const normalized: ThoughtData = {
+      thought: input.thought,
+      ...(input.totalThoughts !== undefined && {
+        totalThoughts: input.totalThoughts,
+      }),
+      ...(input.revisesThought !== undefined && {
+        revisesThought: input.revisesThought,
+      }),
+    };
+    const sessionId = resolveSessionId(input, extra);
     return processThoughtWithTiming(
       engine,
+      sessionId,
       normalized,
       extra,
       includeTextContent

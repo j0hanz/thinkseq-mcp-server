@@ -21,71 +21,133 @@ export interface ThinkingEngineOptions {
   maxThoughts?: number;
   maxMemoryBytes?: number;
   estimatedThoughtOverheadBytes?: number;
+  maxSessions?: number;
+}
+
+interface SessionState {
+  store: ThoughtStore;
+  hasRevisions: boolean;
 }
 
 export class ThinkingEngine {
-  #store: ThoughtStore;
-  #hasRevisions = false;
-
   static readonly DEFAULT_TOTAL_THOUGHTS = 3;
 
+  readonly #maxThoughts: number;
+  readonly #maxMemoryBytes: number;
+  readonly #estimatedThoughtOverheadBytes: number;
+  readonly #maxSessions: number;
+  readonly #sessions = new Map<string, SessionState>();
+
   constructor(options: ThinkingEngineOptions = {}) {
-    const maxThoughts = normalizeInt(
+    this.#maxThoughts = normalizeInt(
       options.maxThoughts,
       DEFAULT_MAX_THOUGHTS,
       { min: 1, max: MAX_THOUGHTS_CAP }
     );
-    const maxMemoryBytes = normalizeInt(
+    this.#maxMemoryBytes = normalizeInt(
       options.maxMemoryBytes,
       MAX_MEMORY_BYTES,
       { min: 1, max: Number.MAX_SAFE_INTEGER }
     );
-    const estimatedThoughtOverheadBytes = normalizeInt(
+    this.#estimatedThoughtOverheadBytes = normalizeInt(
       options.estimatedThoughtOverheadBytes,
       ESTIMATED_THOUGHT_OVERHEAD_BYTES,
       { min: 1, max: Number.MAX_SAFE_INTEGER }
     );
-
-    this.#store = new ThoughtStore({
-      maxThoughts,
-      maxMemoryBytes,
-      estimatedThoughtOverheadBytes,
+    this.#maxSessions = normalizeInt(options.maxSessions, 50, {
+      min: 1,
+      max: 10_000,
     });
+    this.#getSession('default');
   }
 
   processThought(input: ThoughtData): ProcessResult {
+    return this.processThoughtWithSession('default', input);
+  }
+
+  processThoughtWithSession(
+    sessionId: string,
+    input: ThoughtData
+  ): ProcessResult {
+    const session = this.#getSession(sessionId);
+
     if (input.revisesThought !== undefined) {
-      return this.#processRevision(input);
+      return this.#processRevision(session, input);
     }
-    return this.#processNewThought(input);
+    return this.#processNewThought(session, input);
   }
 
-  #processNewThought(input: ThoughtData): ProcessResult {
-    const { stored } = this.#createStoredThought(input);
-    this.#commitThought(stored);
-    return this.#buildProcessResult(stored);
+  #getSession(sessionId: string): SessionState {
+    const key = sessionId.trim() || 'default';
+
+    const existing = this.#sessions.get(key);
+    if (existing) {
+      // bump to most-recent for LRU eviction
+      this.#sessions.delete(key);
+      this.#sessions.set(key, existing);
+      return existing;
+    }
+
+    const state: SessionState = {
+      store: new ThoughtStore({
+        maxThoughts: this.#maxThoughts,
+        maxMemoryBytes: this.#maxMemoryBytes,
+        estimatedThoughtOverheadBytes: this.#estimatedThoughtOverheadBytes,
+      }),
+      hasRevisions: false,
+    };
+
+    this.#sessions.set(key, state);
+    this.#evictSessionsIfNeeded();
+
+    return state;
   }
 
-  #processRevision(input: ThoughtData): ProcessResult {
+  #evictSessionsIfNeeded(): void {
+    while (this.#sessions.size > this.#maxSessions) {
+      const oldestKey = this.#sessions.keys().next().value;
+      if (!oldestKey) return;
+      if (oldestKey === 'default') {
+        const def = this.#sessions.get('default');
+        if (!def) return;
+        this.#sessions.delete('default');
+        this.#sessions.set('default', def);
+        continue;
+      }
+      this.#sessions.delete(oldestKey);
+    }
+  }
+
+  #processNewThought(session: SessionState, input: ThoughtData): ProcessResult {
+    const { stored } = this.#createStoredThought(session.store, input);
+    this.#commitThought(session.store, stored);
+    return this.#buildProcessResult(session, stored);
+  }
+
+  #processRevision(session: SessionState, input: ThoughtData): ProcessResult {
+    const { store } = session;
+
     const resolved = resolveRevisionTarget(input, (thoughtNumber) =>
-      this.#store.getThoughtByNumber(thoughtNumber)
+      store.getThoughtByNumber(thoughtNumber)
     );
-    if (!resolved.ok) return resolved.error;
+    if (!resolved.ok) return resolved.result;
+
     const { targetNumber } = resolved;
 
-    const { numbers, stored } = this.#createStoredThought(input, {
+    const { numbers, stored } = this.#createStoredThought(store, input, {
       revisionOf: targetNumber,
+      fallbackTotalThoughts: resolved.target.totalThoughts,
     });
-    const { supersedes, supersedesTotal } = this.#store.supersedeFrom(
+    const { supersedes, supersedesTotal } = store.supersedeFrom(
       targetNumber,
       numbers.thoughtNumber,
       MAX_SUPERSEDES
     );
 
-    this.#hasRevisions = true;
-    this.#commitThought(stored);
+    session.hasRevisions = true;
+    this.#commitThought(store, stored);
 
-    return this.#buildProcessResult(stored, {
+    return this.#buildProcessResult(session, stored, {
       revises: targetNumber,
       supersedes,
       supersedesTotal,
@@ -117,27 +179,36 @@ export class ThinkingEngine {
   }
 
   #createStoredThought(
+    store: ThoughtStore,
     input: ThoughtData,
-    extras: { revisionOf?: number } = {}
+    extras: { revisionOf?: number; fallbackTotalThoughts?: number } = {}
   ): {
     stored: StoredThought;
     numbers: { thoughtNumber: number; totalThoughts: number };
   } {
-    const effectiveTotalThoughts = this.#resolveEffectiveTotalThoughts(input);
-    const numbers = this.#store.nextThoughtNumbers(effectiveTotalThoughts);
+    const effectiveTotalThoughts = this.#resolveEffectiveTotalThoughts(
+      store,
+      input,
+      extras.fallbackTotalThoughts
+    );
+    const numbers = store.nextThoughtNumbers(effectiveTotalThoughts);
     const stored = this.#buildStoredThought(input, {
       ...numbers,
-      ...extras,
+      ...(extras.revisionOf !== undefined && { revisionOf: extras.revisionOf }),
     });
     return { stored, numbers };
   }
 
-  #commitThought(stored: StoredThought): void {
-    this.#store.storeThought(stored);
-    this.#store.pruneHistoryIfNeeded();
+  #commitThought(store: ThoughtStore, stored: StoredThought): void {
+    store.storeThought(stored);
+    store.pruneHistoryIfNeeded();
   }
 
-  #resolveEffectiveTotalThoughts(input: ThoughtData): number {
+  #resolveEffectiveTotalThoughts(
+    store: ThoughtStore,
+    input: ThoughtData,
+    fallback?: number
+  ): number {
     if (input.totalThoughts !== undefined) {
       return normalizeInt(
         input.totalThoughts,
@@ -146,7 +217,9 @@ export class ThinkingEngine {
       );
     }
 
-    const activeThoughts = this.#store.getActiveThoughts();
+    if (fallback !== undefined) return fallback;
+
+    const activeThoughts = store.getActiveThoughts();
     const lastActive = activeThoughts[activeThoughts.length - 1];
     if (lastActive !== undefined) {
       return lastActive.totalThoughts;
@@ -156,15 +229,15 @@ export class ThinkingEngine {
   }
 
   #buildProcessResult(
+    session: SessionState,
     stored: StoredThought,
     revisionInfo?: RevisionInfo
   ): ProcessResult {
-    const activeThoughts = this.#store.getActiveThoughts();
-    const context = buildContextSummary(activeThoughts, revisionInfo);
-    const isComplete = stored.thoughtNumber >= stored.totalThoughts;
-    const revisableThoughtsTotal = activeThoughts.length;
-    const revisableThoughts = this.#store.getActiveThoughtNumbers(
-      MAX_REVISABLE_THOUGHTS
+    const activeThoughts = session.store.getActiveThoughts();
+    const activePathLength = activeThoughts.length;
+    const { progress, isComplete } = this.#calculateMetrics(
+      activePathLength,
+      stored.totalThoughts
     );
 
     return {
@@ -172,15 +245,27 @@ export class ThinkingEngine {
       result: {
         thoughtNumber: stored.thoughtNumber,
         totalThoughts: stored.totalThoughts,
-        progress: Math.min(1, stored.thoughtNumber / stored.totalThoughts),
+        progress,
         isComplete,
-        thoughtHistoryLength: this.#store.getTotalLength(),
-        hasRevisions: this.#hasRevisions,
-        activePathLength: activeThoughts.length,
-        revisableThoughts,
-        revisableThoughtsTotal,
-        context,
+        thoughtHistoryLength: session.store.getTotalLength(),
+        hasRevisions: session.hasRevisions,
+        activePathLength,
+        revisableThoughts: session.store.getActiveThoughtNumbers(
+          MAX_REVISABLE_THOUGHTS
+        ),
+        revisableThoughtsTotal: activePathLength,
+        context: buildContextSummary(activeThoughts, revisionInfo),
       },
+    };
+  }
+
+  #calculateMetrics(
+    active: number,
+    total: number
+  ): { progress: number; isComplete: boolean } {
+    return {
+      progress: total > 0 ? Math.min(1, active / total) : 1,
+      isComplete: active >= total,
     };
   }
 }

@@ -4,6 +4,10 @@ import type {
   StoredThought,
 } from '../lib/types.js';
 
+const MAX_PREVIEW_CHARS = 100;
+const MAX_RECENT_THOUGHTS = 5;
+const RECENT_TAIL_COUNT = 4;
+
 function selectRecentThoughts(activeThoughts: readonly StoredThought[]): {
   recent: StoredThought[];
   stepIndexes: number[];
@@ -12,14 +16,15 @@ function selectRecentThoughts(activeThoughts: readonly StoredThought[]): {
   const recent: StoredThought[] = [];
   const stepIndexes: number[] = [];
 
-  if (len > 5) {
+  if (len > MAX_RECENT_THOUGHTS) {
     const anchor = activeThoughts[0];
     if (!anchor) throw new Error('Invariant violation: anchor thought missing');
     recent.push(anchor);
     stepIndexes.push(1);
   }
 
-  const start = len <= 5 ? 0 : len - 4;
+  const start =
+    len <= MAX_RECENT_THOUGHTS ? 0 : Math.max(0, len - RECENT_TAIL_COUNT);
   for (let i = start; i < len; i += 1) {
     const thought = activeThoughts[i];
     if (thought) {
@@ -30,9 +35,10 @@ function selectRecentThoughts(activeThoughts: readonly StoredThought[]): {
   return { recent, stepIndexes };
 }
 
-function formatThoughtPreview(thought: string): string {
-  if (thought.length <= 100) return thought;
-  return `${thought.slice(0, 100)}...`;
+function truncatePreview(input: string, maxChars: number): string {
+  const codepoints = Array.from(input);
+  if (codepoints.length <= maxChars) return input;
+  return `${codepoints.slice(0, maxChars).join('')}...`;
 }
 
 export function buildContextSummary(
@@ -44,7 +50,7 @@ export function buildContextSummary(
   const recentThoughts = recent.map((thought, index) => ({
     stepIndex: stepIndexes[index] ?? index + 1,
     number: thought.thoughtNumber,
-    preview: formatThoughtPreview(thought.thought),
+    preview: truncatePreview(thought.thought, MAX_PREVIEW_CHARS),
   }));
 
   if (revisionInfo !== undefined) {

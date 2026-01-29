@@ -4,31 +4,42 @@ import type {
   ThoughtData,
 } from '../lib/types.js';
 
+export type RevisionTargetResolution =
+  | { ok: true; targetNumber: number; target: StoredThought }
+  | { ok: false; result: ProcessResult };
+
 export function resolveRevisionTarget(
   input: ThoughtData,
   getThoughtByNumber: (thoughtNumber: number) => StoredThought | undefined
-): { ok: true; targetNumber: number } | { ok: false; error: ProcessResult } {
+): RevisionTargetResolution {
   const targetNumber = input.revisesThought;
   if (targetNumber === undefined) {
     return {
       ok: false,
-      error: buildRevisionError(
+      result: buildRevisionError(
         'E_REVISION_MISSING',
         'revisesThought is required for revision'
       ),
     };
   }
 
-  const validationError = validateRevisionTarget(
-    getThoughtByNumber,
-    targetNumber
-  );
+  const result = validateRevisionTarget(getThoughtByNumber, targetNumber);
 
-  if (validationError) {
-    return { ok: false, error: validationError };
+  if (result) {
+    return { ok: false, result };
   }
 
-  return { ok: true, targetNumber };
+  const target = getThoughtByNumber(targetNumber);
+  if (!target) {
+    return {
+      ok: false,
+      result: buildRevisionError(
+        'E_REVISION_TARGET_NOT_FOUND',
+        `Thought ${targetNumber} not found`
+      ),
+    };
+  }
+  return { ok: true, targetNumber, target };
 }
 
 function validateRevisionTarget(
