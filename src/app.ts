@@ -1,10 +1,10 @@
+import type { RunDependencies } from './appConfig/runDependencies.js';
 import {
-  buildShutdownDependencies,
-  type ProcessLike,
   resolvePackageIdentity,
   resolveRunDependencies,
-  type RunDependencies,
-} from './appConfig.js';
+} from './appConfig/runDependencies.js';
+import { buildShutdownDependencies } from './appConfig/shutdown.js';
+import type { ProcessLike } from './appConfig/types.js';
 import { installConsoleBridge, installMcpLogging } from './lib/mcpLogging.js';
 
 interface ProcessErrorHandlerDeps {

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { installProcessErrorHandlers, run } from './app.js';
-import type { RunDependencies } from './appConfig.js';
+import type { RunDependencies } from './appConfig/runDependencies.js';
 import { ThinkingEngine } from './engine.js';
 import type { ThinkingEngineOptions } from './engine.js';
 import { getCliHelpText, parseCliConfig } from './lib/cli.js';
