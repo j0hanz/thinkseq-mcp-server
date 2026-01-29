@@ -53,7 +53,7 @@ export async function run(deps: RunDependencies = {}): Promise<void> {
 
   const server = resolved.createServer(name, version);
   installMcpLogging(server);
-  installConsoleBridge(server);
+  const { flush: flushConsole } = installConsoleBridge(server);
 
   resolved.publishLifecycleEvent({
     type: 'lifecycle.started',
@@ -64,6 +64,7 @@ export async function run(deps: RunDependencies = {}): Promise<void> {
   resolved.registerTool(server, engine);
 
   const transport = await resolved.connectServer(server);
+  flushConsole();
   resolved.installShutdownHandlers(
     buildShutdownDependencies(resolved, { server, engine, transport })
   );

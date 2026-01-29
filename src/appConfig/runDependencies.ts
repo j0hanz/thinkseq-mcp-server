@@ -47,7 +47,17 @@ function loadServerInstructions(): string {
 function registerInstructionsResource(server: ServerLike): void {
   server.registerResource(
     'instructions',
-    new ResourceTemplate('internal://instructions', { list: undefined }),
+    new ResourceTemplate('internal://instructions', {
+      list: () => ({
+        resources: [
+          {
+            uri: 'internal://instructions',
+            name: 'Instructions',
+            mimeType: 'text/markdown',
+          },
+        ],
+      }),
+    }),
     { title: 'Instructions', mimeType: 'text/markdown' },
     (uri: URL) => ({
       contents: [

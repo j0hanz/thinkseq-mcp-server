@@ -83,20 +83,37 @@ export function installMcpLogging(target: LoggingTarget): () => void {
   };
 }
 
-export function installConsoleBridge(target: LoggingTarget): void {
+function createConsoleSender(target: LoggingTarget): (text: string) => void {
+  return (text: string) => {
+    void target
+      .sendLoggingMessage({ level: 'info', logger: 'console', data: text })
+      .catch(() => undefined);
+  };
+}
+
+export function installConsoleBridge(target: LoggingTarget): {
+  flush: () => void;
+} {
+  const buffer: string[] = [];
+  let isReady = false;
+  const send = createConsoleSender(target);
+
   console.log = (...args: unknown[]) => {
     const text = args
       .map((a) => (typeof a === 'string' ? a : JSON.stringify(a)))
       .join(' ');
+    if (isReady) {
+      send(text);
+    } else {
+      buffer.push(text);
+    }
+  };
 
-    void target
-      .sendLoggingMessage({
-        level: 'info',
-        logger: 'console',
-        data: text,
-      })
-      .catch(() => {
-        return;
-      });
+  return {
+    flush: () => {
+      isReady = true;
+      buffer.forEach(send);
+      buffer.length = 0;
+    },
   };
 }
