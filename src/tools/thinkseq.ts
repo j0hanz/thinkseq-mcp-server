@@ -19,7 +19,7 @@ import { ThinkSeqOutputSchema } from '../schemas/outputs.js';
 
 function resolveIncludeTextContent(): boolean {
   const raw = process.env.THINKSEQ_INCLUDE_TEXT_CONTENT;
-  if (raw === undefined) return true;
+  if (raw === undefined) return false;
   const normalized = raw.trim().toLowerCase();
   return !FALSY_ENV_VALUES.has(normalized);
 }

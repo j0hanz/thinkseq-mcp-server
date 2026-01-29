@@ -87,18 +87,15 @@ void describe('tools.registerThinkSeq handler success', () => {
     assert.equal(response.structuredContent.ok, true);
     assert.deepEqual(response.structuredContent.result?.thoughtNumber, 1);
     assert.equal(response.isError, undefined);
-    assert.equal(
-      response.content[0].text,
-      JSON.stringify(response.structuredContent)
-    );
+    assert.deepEqual(response.content, []);
   });
 
-  void it('can omit text content when THINKSEQ_INCLUDE_TEXT_CONTENT=0', async (t) => {
+  void it('can include text content when THINKSEQ_INCLUDE_TEXT_CONTENT=1', async (t) => {
     const previous = process.env.THINKSEQ_INCLUDE_TEXT_CONTENT;
-    process.env.THINKSEQ_INCLUDE_TEXT_CONTENT = '0';
+    process.env.THINKSEQ_INCLUDE_TEXT_CONTENT = '1';
     t.after(() => {
       if (previous === undefined) {
-        // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+        process.env.THINKSEQ_INCLUDE_TEXT_CONTENT = '';
         delete process.env.THINKSEQ_INCLUDE_TEXT_CONTENT;
       } else {
         process.env.THINKSEQ_INCLUDE_TEXT_CONTENT = previous;
@@ -109,7 +106,10 @@ void describe('tools.registerThinkSeq handler success', () => {
     const response = await handler(createThoughtInput());
 
     assert.equal(response.structuredContent.ok, true);
-    assert.deepEqual(response.content, []);
+    assert.equal(
+      response.content[0].text,
+      JSON.stringify(response.structuredContent)
+    );
   });
 });
 
@@ -198,10 +198,7 @@ void describe('tools.registerThinkSeq handler error', () => {
     assert.equal(response.isError, true);
     assert.deepEqual(response.structuredContent.ok, false);
     assert.deepEqual(response.structuredContent.error?.code, 'E_TEST');
-    assert.equal(
-      response.content[0].text,
-      JSON.stringify(response.structuredContent)
-    );
+    assert.deepEqual(response.content, []);
   });
 });
 

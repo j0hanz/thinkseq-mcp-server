@@ -13,6 +13,7 @@ export interface StoredThought {
   revisionOf?: number;
   supersededBy?: number;
   isActive: boolean;
+  byteLength: number;
 }
 
 export interface RevisionInfo {

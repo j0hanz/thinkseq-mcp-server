@@ -159,9 +159,7 @@ export class ThoughtStore {
   }
 
   #estimateThoughtBytes(thought: StoredThought): number {
-    return (
-      Buffer.byteLength(thought.thought) + this.#estimatedThoughtOverheadBytes
-    );
+    return thought.byteLength + this.#estimatedThoughtOverheadBytes;
   }
 
   #dropActiveThoughtsUpTo(thoughtNumber: number): void {

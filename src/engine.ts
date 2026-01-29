@@ -112,6 +112,7 @@ export class ThinkingEngine {
       ...(details.revisionOf !== undefined && {
         revisionOf: details.revisionOf,
       }),
+      byteLength: Buffer.byteLength(input.thought),
     };
   }
 

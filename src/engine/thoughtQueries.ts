@@ -8,20 +8,25 @@ function selectRecentThoughts(activeThoughts: readonly StoredThought[]): {
   recent: StoredThought[];
   stepIndexes: number[];
 } {
-  if (activeThoughts.length <= 5) {
-    const recent = activeThoughts.slice();
-    const stepIndexes = recent.map((_, index) => index + 1);
-    return { recent, stepIndexes };
+  const len = activeThoughts.length;
+  const recent: StoredThought[] = [];
+  const stepIndexes: number[] = [];
+
+  if (len > 5) {
+    const anchor = activeThoughts[0];
+    if (!anchor) throw new Error('Invariant violation: anchor thought missing');
+    recent.push(anchor);
+    stepIndexes.push(1);
   }
 
-  const anchor = activeThoughts[0];
-  if (!anchor) throw new Error('Invariant violation: anchor thought missing');
-  const tail = activeThoughts.slice(-4);
-  const recent = [anchor, ...tail];
-  const stepIndexes = [
-    1,
-    ...tail.map((_, index) => activeThoughts.length - 4 + index + 1),
-  ];
+  const start = len <= 5 ? 0 : len - 4;
+  for (let i = start; i < len; i += 1) {
+    const thought = activeThoughts[i];
+    if (thought) {
+      recent.push(thought);
+      stepIndexes.push(i + 1);
+    }
+  }
   return { recent, stepIndexes };
 }
 
