@@ -26,14 +26,8 @@ const FALSY_ENV_VALUES = new Set(['0', 'false', 'no', 'off']);
 
 const THINKSEQ_TOOL_DEFINITION = {
   title: 'Think Sequentially',
-  description: `Record a concise thinking step (max 8000 chars). Be brief: capture only the essential insight, calculation, or decision.
-
-REVISION (DESTRUCTIVE REWIND): If you realize an earlier step was wrong, use \`revisesThought\` to correct it.
-Revising a thought will supersede (discard from the active chain) the target thought and all later active thoughts, then continue from the corrected step. Older thoughts remain preserved for audit.
-
-Example: { "thought": "Better approach: use caching", "revisesThought": 3 }
-
-Returns: thoughtNumber, progress (0-1), isComplete, revisableThoughts (+revisableThoughtsTotal), and recent thought previews.`,
+  description:
+    'Record a concise thinking step (max 8000 chars). Be brief: capture only the essential insight, calculation, or decision.\n\nREVISION (DESTRUCTIVE REWIND): If you realize an earlier step was wrong, use `revisesThought` to correct it.\nRevising a thought will supersede (discard from the active chain) the target thought and all later active thoughts, then continue from the corrected step. Older thoughts remain preserved for audit.\n\nExample: { "thought": "Better approach: use caching", "revisesThought": 3 }\n\nReturns: thoughtNumber, progress (0-1), isComplete, revisableThoughts (+revisableThoughtsTotal), and recent thought previews.',
   inputSchema: ThinkSeqInputSchema,
   outputSchema: ThinkSeqOutputSchema,
 };
@@ -74,27 +68,47 @@ function publishToolEnd(
   });
 }
 
+type ToolOutcome =
+  | { ok: true; progress: number }
+  | { ok: false; errorCode: string; errorMessage: string };
+
+function finalizeToolEvent(
+  outcome: ToolOutcome,
+  durationMs: number,
+  extra: ToolExtra | undefined
+): void {
+  if (outcome.ok) {
+    publishToolEnd({ ok: true, durationMs });
+    void sendProgress(extra, outcome.progress, 'completed');
+    return;
+  }
+  publishToolEnd({
+    ok: false,
+    errorCode: outcome.errorCode,
+    errorMessage: outcome.errorMessage,
+    durationMs,
+  });
+  void sendProgress(extra, 1, 'failed');
+}
+
 function buildErrorResponse(
   code: string,
   message: string,
   includeTextContent: boolean
 ): ToolResponse {
-  return createErrorResponse(code, message, undefined, {
-    includeTextContent,
-  });
+  return createErrorResponse(code, message, undefined, { includeTextContent });
 }
 
 function buildToolResponse(
   result: ProcessResult,
   options: { includeTextContent: boolean }
 ): ToolResponse {
-  if (!result.ok) {
+  if (!result.ok)
     return buildErrorResponse(
       result.error.code,
       result.error.message,
       options.includeTextContent
     );
-  }
   const structured: ThinkSeqOutput = {
     ok: true,
     result: {
@@ -141,7 +155,7 @@ async function safeSendNotification(
         progressToken,
         progress,
         total: 1,
-        ...(message && { message }),
+        ...(message ? { message } : {}),
       },
     });
   } catch {
@@ -160,7 +174,6 @@ function resolveSessionId(input: ThinkSeqInput, extra?: ToolExtra): string {
     meta.chatId,
     meta.clientId,
   ];
-
   const found = candidates.find(
     (c): c is string | number =>
       (typeof c === 'string' && c.trim().length > 0) ||
@@ -209,17 +222,22 @@ function handleThoughtResult(
   extra: ToolExtra | undefined
 ): void {
   if (result.ok) {
-    publishToolEnd({ ok: true, durationMs });
-    void sendProgress(extra, result.result.progress, 'completed');
-  } else {
-    publishToolEnd({
+    finalizeToolEvent(
+      { ok: true, progress: result.result.progress },
+      durationMs,
+      extra
+    );
+    return;
+  }
+  finalizeToolEvent(
+    {
       ok: false,
       errorCode: result.error.code,
       errorMessage: result.error.message,
-      durationMs,
-    });
-    void sendProgress(extra, 1, 'failed');
-  }
+    },
+    durationMs,
+    extra
+  );
 }
 
 function handleThoughtError(
@@ -230,14 +248,24 @@ function handleThoughtError(
 ): ToolResponse {
   const errorMessage = getErrorMessage(err);
   const durationMs = getDurationMs(start);
-  publishToolEnd({
-    ok: false,
-    errorCode: 'E_THINK',
-    errorMessage,
+  finalizeToolEvent(
+    { ok: false, errorCode: 'E_THINK', errorMessage },
     durationMs,
-  });
-  void sendProgress(extra, 1, 'failed');
+    extra
+  );
   return buildErrorResponse('E_THINK', errorMessage, includeTextContent);
+}
+
+function buildThoughtData(input: ThinkSeqInput): ThoughtData {
+  return {
+    thought: input.thought,
+    ...(input.totalThoughts !== undefined
+      ? { totalThoughts: input.totalThoughts }
+      : {}),
+    ...(input.revisesThought !== undefined
+      ? { revisesThought: input.revisesThought }
+      : {}),
+  };
 }
 
 async function handleThinkSeq(
@@ -251,15 +279,7 @@ async function handleThinkSeq(
 
   return runWithContext(async () => {
     const includeTextContent = resolveIncludeTextContent();
-    const normalized: ThoughtData = {
-      thought: input.thought,
-      ...(input.totalThoughts !== undefined && {
-        totalThoughts: input.totalThoughts,
-      }),
-      ...(input.revisesThought !== undefined && {
-        revisesThought: input.revisesThought,
-      }),
-    };
+    const normalized = buildThoughtData(input);
     const sessionId = resolveSessionId(input, extra);
     return processThoughtWithTiming(
       engine,

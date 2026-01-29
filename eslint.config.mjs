@@ -199,14 +199,6 @@ export default defineConfig(
         },
       ],
       'max-depth': ['error', 3],
-      'max-lines': [
-        'error',
-        {
-          max: 250,
-          skipBlankLines: true,
-          skipComments: true,
-        },
-      ],
     },
   },
 

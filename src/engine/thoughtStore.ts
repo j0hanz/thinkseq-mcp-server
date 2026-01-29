@@ -44,10 +44,7 @@ export class ThoughtStore {
       totalThoughts,
       this.#activeMaxTotalThoughts
     );
-    return {
-      thoughtNumber,
-      totalThoughts: effectiveTotalThoughts,
-    };
+    return { thoughtNumber, totalThoughts: effectiveTotalThoughts };
   }
 
   getLastPruneStats(): PruneStats | null {
@@ -76,7 +73,7 @@ export class ThoughtStore {
     this.#activeMaxTotalThoughts = maxTotal;
   }
 
-  #findActiveThoughtIndex(thoughtNumber: number): number {
+  #findActiveLowerBound(thoughtNumber: number): number {
     const activeThoughtNumbers = this.#activeThoughtNumbers;
     let low = 0;
     let high = activeThoughtNumbers.length;
@@ -87,13 +84,25 @@ export class ThoughtStore {
       if (midValue < thoughtNumber) low = mid + 1;
       else high = mid;
     }
+    return low;
+  }
+
+  #findActiveThoughtIndex(thoughtNumber: number): number {
+    const index = this.#findActiveLowerBound(thoughtNumber);
+    if (index < 0) return -1;
     if (
-      low < activeThoughtNumbers.length &&
-      activeThoughtNumbers[low] === thoughtNumber
-    ) {
-      return low;
-    }
+      index < this.#activeThoughtNumbers.length &&
+      this.#activeThoughtNumbers[index] === thoughtNumber
+    )
+      return index;
     return -1;
+  }
+
+  #findFirstActiveIndexAfter(thoughtNumber: number): number {
+    const index = this.#findActiveLowerBound(thoughtNumber);
+    if (index < 0) return 0;
+    if (this.#activeThoughtNumbers[index] === thoughtNumber) return index + 1;
+    return index;
   }
 
   supersedeFrom(
@@ -198,12 +207,7 @@ export class ThoughtStore {
 
   #dropActiveThoughtsUpTo(thoughtNumber: number): void {
     if (this.#activeThoughts.length === 0) return;
-    let startIndex = 0;
-    while (startIndex < this.#activeThoughts.length) {
-      const thought = this.#activeThoughts[startIndex];
-      if (!thought || thought.thoughtNumber > thoughtNumber) break;
-      startIndex += 1;
-    }
+    const startIndex = this.#findFirstActiveIndexAfter(thoughtNumber);
     if (startIndex === 0) return;
     this.#activeThoughts = this.#activeThoughts.slice(startIndex);
     this.#activeThoughtNumbers = this.#activeThoughtNumbers.slice(startIndex);
