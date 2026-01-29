@@ -2,6 +2,12 @@ import { z } from 'zod';
 
 export const ThinkSeqInputSchema = z.strictObject({
   thought: z.string().min(1).max(8000).describe('Your current thinking step'),
+  sessionId: z
+    .string()
+    .min(1)
+    .max(200)
+    .optional()
+    .describe('Optional session identifier to isolate thought histories'),
   totalThoughts: z
     .number()
     .int()

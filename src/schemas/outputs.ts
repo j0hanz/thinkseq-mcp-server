@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { MAX_REVISABLE_THOUGHTS, MAX_SUPERSEDES } from '../engineConfig.js';
 
-const ThinkSeqResultSchema = z.object({
+const ThinkSeqResultSchema = z.strictObject({
   thoughtNumber: z.number(),
   totalThoughts: z.number(),
   progress: z.number().min(0).max(1),
@@ -17,10 +17,10 @@ const ThinkSeqResultSchema = z.object({
     .max(MAX_REVISABLE_THOUGHTS)
     .describe('Thought numbers available for revision'),
   revisableThoughtsTotal: z.number(),
-  context: z.object({
+  context: z.strictObject({
     recentThoughts: z
       .array(
-        z.object({
+        z.strictObject({
           stepIndex: z
             .number()
             .int()
@@ -32,7 +32,7 @@ const ThinkSeqResultSchema = z.object({
       )
       .max(5),
     revisionInfo: z
-      .object({
+      .strictObject({
         revises: z.number(),
         supersedes: z.array(z.number()).max(MAX_SUPERSEDES),
         supersedesTotal: z.number(),
@@ -41,7 +41,7 @@ const ThinkSeqResultSchema = z.object({
   }),
 });
 
-const ThinkSeqErrorSchema = z.object({
+const ThinkSeqErrorSchema = z.strictObject({
   code: z.string(),
   message: z.string(),
 });

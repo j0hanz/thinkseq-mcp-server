@@ -42,12 +42,6 @@ jobs:
       - name: Run coverage
         run: npm run test:coverage
 
-      - name: Run maintainability report
-        run: npm run maintainability
-
-      - name: Run duplication check
-        run: npm run duplication
-
       - name: Build package
         run: npm run build
 

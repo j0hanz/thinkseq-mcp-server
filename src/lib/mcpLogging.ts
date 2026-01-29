@@ -93,10 +93,12 @@ function createConsoleSender(target: LoggingTarget): (text: string) => void {
 
 export function installConsoleBridge(target: LoggingTarget): {
   flush: () => void;
+  restore: () => void;
 } {
   const buffer: string[] = [];
   let isReady = false;
   const send = createConsoleSender(target);
+  const originalLog = console.log;
 
   console.log = (...args: unknown[]) => {
     const text = args
@@ -114,6 +116,9 @@ export function installConsoleBridge(target: LoggingTarget): {
       isReady = true;
       buffer.forEach(send);
       buffer.length = 0;
+    },
+    restore: () => {
+      console.log = originalLog;
     },
   };
 }

@@ -164,6 +164,12 @@ async function safeSendNotification(
 }
 
 function resolveSessionId(input: ThinkSeqInput, extra?: ToolExtra): string {
+  if (
+    typeof input.sessionId === 'string' &&
+    input.sessionId.trim().length > 0
+  ) {
+    return input.sessionId.trim();
+  }
   const meta = extra?._meta as Record<string, unknown> | undefined;
   if (!meta) return 'default';
 

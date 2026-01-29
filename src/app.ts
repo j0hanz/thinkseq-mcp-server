@@ -53,7 +53,9 @@ export async function run(deps: RunDependencies = {}): Promise<void> {
 
   const server = resolved.createServer(name, version);
   installMcpLogging(server);
-  const { flush: flushConsole } = installConsoleBridge(server);
+  const { flush: flushConsole, restore: restoreConsole } =
+    installConsoleBridge(server);
+  process.on('exit', restoreConsole);
 
   resolved.publishLifecycleEvent({
     type: 'lifecycle.started',
