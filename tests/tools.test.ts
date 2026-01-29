@@ -87,7 +87,12 @@ void describe('tools.registerThinkSeq handler success', () => {
     assert.equal(response.structuredContent.ok, true);
     assert.deepEqual(response.structuredContent.result?.thoughtNumber, 1);
     assert.equal(response.isError, undefined);
-    assert.deepEqual(response.content, []);
+    assert.equal(response.content.length, 1);
+    assert.equal(response.content[0].type, 'text');
+    assert.equal(
+      response.content[0].text,
+      JSON.stringify(response.structuredContent)
+    );
   });
 
   void it('can include text content when THINKSEQ_INCLUDE_TEXT_CONTENT=1', async (t) => {
@@ -198,7 +203,12 @@ void describe('tools.registerThinkSeq handler error', () => {
     assert.equal(response.isError, true);
     assert.deepEqual(response.structuredContent.ok, false);
     assert.deepEqual(response.structuredContent.error?.code, 'E_TEST');
-    assert.deepEqual(response.content, []);
+    assert.equal(response.content.length, 1);
+    assert.equal(response.content[0].type, 'text');
+    assert.equal(
+      response.content[0].text,
+      JSON.stringify(response.structuredContent)
+    );
   });
 });
 

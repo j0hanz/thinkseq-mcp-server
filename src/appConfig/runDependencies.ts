@@ -111,7 +111,7 @@ function buildServerConfig(): {
     instructions: SERVER_INSTRUCTIONS,
     capabilities: {
       logging: {},
-      tools: { listChanged: true },
+      tools: { listChanged: false },
       resources: { subscribe: false, listChanged: false },
       prompts: { listChanged: false },
     },
