@@ -1,67 +1,196 @@
 # ThinkSeq MCP Server
 
-<img src="assets/logo.svg" alt="ThinkSeq MCP Server Logo" width="175" />
+<img src="assets/logo.svg" alt="ThinkSeq MCP Server Logo" width="225" />
 
-An MCP server for structured, sequential thinking with revision support.
-
-[![npm version](https://img.shields.io/npm/v/@j0hanz/thinkseq-mcp.svg)](https://www.npmjs.com/package/@j0hanz/thinkseq-mcp)
-
-## One-click install
+[![npm version](https://img.shields.io/npm/v/@j0hanz/thinkseq-mcp.svg)](https://www.npmjs.com/package/@j0hanz/thinkseq-mcp)[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)[![Powered by MCP](https://img.shields.io/badge/MCP-SDK-blue)](https://github.com/modelcontextprotocol/typescript-sdk)
 
 [![Install with NPX in VS Code](https://img.shields.io/badge/VS_Code-Install-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=thinkseq&inputs=%5B%5D&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40j0hanz%2Fthinkseq-mcp%40latest%22%5D%7D) [![Install with NPX in VS Code Insiders](https://img.shields.io/badge/VS_Code_Insiders-Install-24bfa5?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=thinkseq&inputs=%5B%5D&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40j0hanz%2Fthinkseq-mcp%40latest%22%5D%7D&quality=insiders)
 
 [![Install in Cursor](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/install-mcp?name=thinkseq&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkBqMGhhbnovdGhpbmtzZXEtbWNwQGxhdGVzdCJdfQ==)
 
+An MCP server for structured, sequential thinking with revision support.
+
 ## Overview
 
-ThinkSeq exposes a single MCP tool, `thinkseq`, for structured, sequential thinking. The server runs over stdio and stores an in-memory thought history so it can return progress, active-path context, and revision metadata on each call.
+ThinkSeq exposes a single MCP tool, `thinkseq`, that enables Language Models to "think" in a structured, step-by-step manner. It maintains an in-memory history of thoughts, calculates progress, and critically allows for **destructive revision**—where a model can realize a mistake, "rewind" to a previous step, and branch off with a correction. This capability mirrors human reasoning patterns and improves problem-solving accuracy for complex tasks.
 
-## Quick start
+## Key Features
+
+- **Sequential Thinking**: Records thoughts as discrete steps with auto-incrementing numbers.
+- **Progress Tracking**: Automatically calculates progress (0.0 to 1.0) based on estimated total thoughts.
+- **Revision Support**: Allows models to revise specific past thoughts, superseding the old path and starting a new reasoning branch.
+- **Context Awareness**: Returns recent thoughts and revision context with every tool call to keep the model grounded.
+- **Session Isolation**: Supports multiple concurrent thinking sessions via `sessionId`.
+- **Memory Management**: Configurable limits for max thoughts and memory usage to prevent resource exhaustion.
+
+## Tech Stack
+
+- **Runtime**: Node.js >=22.0.0
+- **Language**: TypeScript 5.9+
+- **MCP SDK**: `@modelcontextprotocol/sdk`
+- **Validation**: `zod`
+
+## Repository Structure
+
+```text
+c:\thinkseq-mcp
+├── dist/                 # Compiled JavaScript
+├── src/
+│   ├── app.ts            # Application entry and MCP wiring
+│   ├── engine.ts         # Core thinking engine logic
+│   ├── engineConfig.ts   # Configuration defaults
+│   ├── index.ts          # CLI entrypoint
+│   ├── lib/              # Utilities (CLI, logging, types)
+│   ├── schemas/          # Zod schemas for inputs/outputs
+│   └── tools/            # MCP tool definitions
+├── package.json
+└── tsconfig.json
+```
+
+## Requirements
+
+- **Node.js**: Version 22.0.0 or higher.
+
+## Quickstart
+
+To run the server using `npx`:
 
 ```bash
 npx -y @j0hanz/thinkseq-mcp@latest
 ```
 
-## CLI options
+<details>
+<summary><b>Quick Test with MCP Inspector</b></summary>
+
+You can inspect the tools using the MCP Inspector:
 
 ```bash
-thinkseq --max-thoughts 500 --max-memory-mb 100
+npx @modelcontextprotocol/inspector npx -y @j0hanz/thinkseq-mcp@latest
 ```
 
-Available flags:
+</details>
 
-- `--max-thoughts <number>`: Max thoughts to keep in memory.
-- `--max-memory-mb <number>`: Max memory (MB) for stored thoughts.
-- `--shutdown-timeout-ms <number>`: Graceful shutdown timeout.
-- `--package-read-timeout-ms <number>`: Package.json read timeout.
-- `-h, --help`: Show help.
+## Installation
 
-Defaults and limits:
+### Using NPX (Recommended)
 
-- `maxThoughts` default: 500 (cap 10000).
-- `maxMemoryBytes` default: 100 MB (derived from `--max-memory-mb`).
-- `packageReadTimeoutMs` default: 2000 ms.
-- `shutdownTimeoutMs` default: 5000 ms.
+This server is designed to be run directly via `npx` in your MCP client configuration.
 
-## MCP client configuration
+```bash
+npx -y @j0hanz/thinkseq-mcp@latest
+```
 
-Add this to your MCP client settings:
+### From Source
+
+1. Clone the repository:
+
+   ```bash
+   git clone https://github.com/j0hanz/thinkseq-mcp-server.git
+   cd thinkseq-mcp-server
+   ```
+
+2. Install dependencies:
+
+   ```bash
+   npm install
+   ```
+
+3. Build the project:
+
+   ```bash
+   npm run build
+   ```
+
+4. Run the server:
+
+   ```bash
+   node dist/index.js
+   ```
+
+## Configuration
+
+The server is configured via CLI arguments.
+
+| Argument                             | Description                                   | Default |
+| :----------------------------------- | :-------------------------------------------- | :------ |
+| `--max-thoughts <number>`            | Max thoughts to keep in memory before pruning | 500     |
+| `--max-memory-mb <number>`           | Max memory (MB) for stored thoughts           | 100     |
+| `--shutdown-timeout-ms <number>`     | Graceful shutdown timeout in ms               | 5000    |
+| `--package-read-timeout-ms <number>` | Package.json read timeout in ms               | 2000    |
+| `-h, --help`                         | Show help message                             | -       |
+
+## MCP Surface
+
+### Tools
+
+#### `thinkseq`
+
+Record a concise thinking step. Be brief: capture only the essential insight, calculation, or decision.
+
+**Parameters:**
+
+| Name             | Type    | Required | Description                                                                                                           |
+| :--------------- | :------ | :------: | :-------------------------------------------------------------------------------------------------------------------- |
+| `thought`        | string  |   Yes    | Your current thinking step (1-8000 chars).                                                                            |
+| `sessionId`      | string  |    No    | Optional session identifier (max 200 chars) to isolate thought histories.                                             |
+| `totalThoughts`  | integer |    No    | Estimated total thoughts (1-25, default: 3).                                                                          |
+| `revisesThought` | integer |    No    | Revise a previous thought by number. The original is preserved for audit, but the active chain rewinds to this point. |
+
+**Returns:**
+
+A JSON object containing the current state of the thinking process, including:
+
+- `thoughtNumber`: The current step number.
+- `progress`: A value between 0 and 1 indicating completion.
+- `isComplete`: Boolean indicating if the thought process is finished.
+- `revisableThoughts`: Array of thought numbers that can be revised.
+- `context`: Recent thoughts and revision information.
+
+**Example Input:**
 
 ```json
 {
-  "mcpServers": {
-    "thinkseq": {
-      "command": "npx",
-      "args": ["-y", "@j0hanz/thinkseq-mcp@latest"]
+  "thought": "I need to calculate the fibonacci sequence up to 10.",
+  "totalThoughts": 5
+}
+```
+
+**Example Output:**
+
+```json
+{
+  "ok": true,
+  "result": {
+    "thoughtNumber": 1,
+    "totalThoughts": 5,
+    "progress": 0.2,
+    "isComplete": false,
+    "revisableThoughts": [1],
+    "context": {
+      "recentThoughts": [
+        {
+          "stepIndex": 1,
+          "number": 1,
+          "preview": "I need to calculate the fibonacci sequence up to 10."
+        }
+      ]
     }
   }
 }
 ```
 
-<details>
-<summary><b>VS Code</b></summary>
+### Resources
 
-Add to your `mcp.json` (command palette: "MCP: Open Settings"):
+_No resources are currently exposed by this server._
+
+### Prompts
+
+_No prompts are currently exposed by this server._
+
+## Client Configuration Examples
+
+<details>
+<summary><b>VS Code (mcp.json)</b></summary>
 
 ```json
 {
@@ -79,7 +208,7 @@ Add to your `mcp.json` (command palette: "MCP: Open Settings"):
 <details>
 <summary><b>Claude Desktop</b></summary>
 
-Add to your `claude_desktop_config.json`:
+Add this to your `claude_desktop_config.json`:
 
 ```json
 {
@@ -97,254 +226,48 @@ Add to your `claude_desktop_config.json`:
 <details>
 <summary><b>Cursor</b></summary>
 
-1. Go to **Cursor Settings** > **General** > **MCP**.
+1. Navigate to **Settings** > **General** > **MCP**.
 2. Click **Add New MCP Server**.
-3. Fill in the details:
-   - **Name:** `thinkseq`
-   - **Type:** `command`
-   - **Command:** `npx -y @j0hanz/thinkseq-mcp@latest`
+3. Name: `thinkseq`
+4. Type: `command`
+5. Command: `npx -y @j0hanz/thinkseq-mcp@latest`
 
 </details>
 
-<details>
-<summary><b>Windsurf</b></summary>
+## Security
 
-Add to your `~/.codeium/windsurf/mcp_config.json`:
+- **Stdio Transport**: This server runs over stdio. It creates a console bridge to intercept `console.log` calls and redirect them to standard error (stderr) to prevent interfering with the JSON-RPC protocol.
+- **Memory Limits**: The server enforces maximum thought counts and memory usage limits (configurable via CLI) to prevent memory exhaustion attacks.
+- **Input Validation**: All inputs are strictly validated using Zod schemas.
 
-```json
-{
-  "mcpServers": {
-    "thinkseq": {
-      "command": "npx",
-      "args": ["-y", "@j0hanz/thinkseq-mcp@latest"]
-    }
-  }
-}
-```
+## Development Workflow
 
-</details>
+1. **Install dependencies**:
 
-## Tool: `thinkseq`
+   ```bash
+   npm install
+   ```
 
-Record a concise thinking step. Be brief: capture only the essential insight, calculation, or decision-like a minimal draft, not a verbose explanation.
+2. **Run in development mode**:
 
-### Input
+   ```bash
+   npm run dev      # Runs tsc in watch mode
+   npm run dev:run  # Runs the built app in watch mode
+   ```
 
-| Field            | Type   | Required | Description                                                        |
-| :--------------- | :----- | :------: | :----------------------------------------------------------------- |
-| `thought`        | string |   yes    | Current thinking step (1-8000 chars).                              |
-| `sessionId`      | string |    no    | Optional session identifier to isolate thought histories.          |
-| `totalThoughts`  | number |    no    | Estimated total thoughts (1-25, default: 3).                       |
-| `revisesThought` | number |    no    | Revise a previous thought by number. Original preserved for audit. |
+3. **Run tests**:
 
-### Output
+   ```bash
+   npm test
+   ```
 
-The tool returns `structuredContent` with an `ok` flag. On success, `result` is populated; on error, `error` is populated.
+4. **Lint and Format**:
 
-Envelope fields:
+   ```bash
+   npm run lint
+   npm run format
+   ```
 
-| Field    | Type    | Description                          |
-| :------- | :------ | :----------------------------------- |
-| `ok`     | boolean | `true` on success, `false` on error. |
-| `result` | object  | Present when `ok` is true.           |
-| `error`  | object  | Present when `ok` is false.          |
+## Contributing & License
 
-Result fields:
-
-| Field                  | Type     | Description                                          |
-| :--------------------- | :------- | :--------------------------------------------------- |
-| `thoughtNumber`        | number   | Auto-incremented thought number.                     |
-| `totalThoughts`        | number   | Effective total thoughts (at least `thoughtNumber`). |
-| `progress`             | number   | `thoughtNumber / totalThoughts` (0 to 1).            |
-| `isComplete`           | boolean  | `true` when `thoughtNumber >= totalThoughts`.        |
-| `thoughtHistoryLength` | number   | Stored thought count after pruning.                  |
-| `hasRevisions`         | boolean  | `true` if any thought has been revised.              |
-| `activePathLength`     | number   | Count of non-superseded thoughts.                    |
-| `revisableThoughts`    | number[] | Thought numbers available for revision.              |
-| `context`              | object   | Recent context summary (see below).                  |
-
-Context fields:
-
-| Field            | Type   | Description                                                             |
-| :--------------- | :----- | :---------------------------------------------------------------------- |
-| `recentThoughts` | array  | Up to the last 5 active thoughts with `stepIndex`, `number`, `preview`. |
-| `revisionInfo`   | object | Present when revising: `revises` (number) and `supersedes` (number[]).  |
-
-Notes:
-
-- `recentThoughts` previews are truncated to 100 characters.
-- Revisions are a destructive rewind: they supersede the target thought and any later active thoughts in the active chain.
-- `recentThoughts[].stepIndex` is a contiguous 1-based index in the current active chain (useful when thought numbers become non-contiguous after revisions).
-
-Error fields:
-
-| Code                           | Description                                     |
-| :----------------------------- | :---------------------------------------------- |
-| `E_REVISION_TARGET_NOT_FOUND`  | The requested thought number does not exist.    |
-| `E_REVISION_TARGET_SUPERSEDED` | The requested thought was already superseded.   |
-| `E_THINK`                      | Unexpected tool failure while processing input. |
-
-### Example
-
-**Basic usage:**
-
-Input:
-
-```json
-{
-  "thought": "3 steps: parse -> validate -> transform"
-}
-```
-
-Output (success):
-
-```json
-{
-  "ok": true,
-  "result": {
-    "thoughtNumber": 1,
-    "totalThoughts": 3,
-    "progress": 0.3333333333333333,
-    "isComplete": false,
-    "thoughtHistoryLength": 1,
-    "hasRevisions": false,
-    "activePathLength": 1,
-    "revisableThoughts": [1],
-    "context": {
-      "recentThoughts": [
-        {
-          "stepIndex": 1,
-          "number": 1,
-          "preview": "3 steps: parse -> validate -> transform"
-        }
-      ]
-    }
-  }
-}
-```
-
-**Revising a thought:**
-
-If you realize an earlier step was wrong, use `revisesThought` to correct it:
-
-Input:
-
-```json
-{
-  "thought": "Better approach: validate first, then parse",
-  "revisesThought": 1
-}
-```
-
-Output:
-
-```json
-{
-  "ok": true,
-  "result": {
-    "thoughtNumber": 2,
-    "totalThoughts": 3,
-    "progress": 0.6666666666666666,
-    "isComplete": false,
-    "thoughtHistoryLength": 2,
-    "hasRevisions": true,
-    "activePathLength": 1,
-    "revisableThoughts": [2],
-    "context": {
-      "recentThoughts": [
-        {
-          "stepIndex": 1,
-          "number": 2,
-          "preview": "Better approach: validate first, then parse"
-        }
-      ],
-      "revisionInfo": {
-        "revises": 1,
-        "supersedes": [1]
-      }
-    }
-  }
-}
-```
-
-## Behavior and validation
-
-- Inputs are validated with Zod and unknown keys are rejected.
-- `thoughtNumber` is auto-incremented (1, 2, 3...).
-- `totalThoughts` defaults to 3, must be in 1-25, and is adjusted up to at least `thoughtNumber`.
-- The engine stores thoughts in memory and prunes when limits are exceeded:
-  - `maxThoughts` default: 500 (cap 10000). When exceeded, prunes the oldest 10% (minimum excess).
-  - `maxMemoryBytes` default: 100 MB. When exceeded and history is large, prunes roughly 20% of history.
-  - `estimatedThoughtOverheadBytes` default: 200.
-
-## Diagnostics
-
-This server publishes events via `node:diagnostics_channel`:
-
-- `thinkseq:tool` for `tool.start` and `tool.end` (includes duration, errors, and request context).
-- `thinkseq:lifecycle` for `lifecycle.started` and `lifecycle.shutdown`.
-
-## Configuration
-
-No environment variables or CLI flags are required for basic operation. The server runs over stdio, enforces MCP initialization order, and validates protocol versions. Invalid JSON-RPC message shapes and parse errors are surfaced as JSON-RPC errors on stdio.
-
-## Development
-
-### Prerequisites
-
-- Node.js >= 20.0.0
-
-### Scripts
-
-| Command                  | Description                      |
-| :----------------------- | :------------------------------- |
-| `npm run build`          | Compile TypeScript to `dist/`.   |
-| `npm run dev`            | Run the server in watch mode.    |
-| `npm start`              | Run `dist/index.js`.             |
-| `npm run test`           | Run the test suite.              |
-| `npm run test:ci`        | Build, then run the test suite.  |
-| `npm run test:coverage`  | Run tests with coverage output.  |
-| `npm run lint`           | Lint with ESLint.                |
-| `npm run format`         | Format with Prettier.            |
-| `npm run format:check`   | Check formatting with Prettier.  |
-| `npm run type-check`     | Type-check without emitting.     |
-| `npm run inspector`      | Launch the MCP inspector.        |
-| `npm run clean`          | Remove `dist/`.                  |
-| `npm run prepublishOnly` | Lint, type-check, and build.     |
-| `npm run benchmark`      | Run `benchmark/engine.bench.ts`. |
-
-Benchmark environment variables:
-
-- `THINKSEQ_BENCH_SAMPLES` (default: 1)
-- `THINKSEQ_BENCH_NEW_ITERATIONS` (default: 10000)
-- `THINKSEQ_BENCH_REV_ITERATIONS` (default: 1000)
-- `THINKSEQ_BENCH_WARMUP` (default: 1000)
-- `THINKSEQ_BENCH_PIN` (optional CPU affinity mask)
-
-### Project structure
-
-```text
-src/
-  app.ts           # Application setup and MCP wiring
-  appConfig.ts     # Dependency wiring and shutdown handling
-  engine.ts        # Core thinking engine
-  engineConfig.ts  # Defaults and limits
-  engine/          # Revision and query helpers
-  lib/             # CLI, diagnostics, errors, protocol, stdio utilities
-  schemas/         # Zod input/output schemas
-  tools/           # MCP tool definitions (thinkseq)
-tests/             # Node.js tests
-benchmark/         # Benchmark targets
-docs/              # Assets (logo)
-dist/              # Build output
-scripts/           # Quality gates and metrics helpers
-metrics/           # Generated metrics outputs
-```
-
-## Troubleshooting
-
-- CI workflow references `npm run maintainability` and `npm run duplication`, but these scripts are not defined in `package.json`.
-
-## Contributing
-
-Contributions are welcome. Please open a pull request with a clear description and include relevant tests.
+This project is licensed under the MIT License.
