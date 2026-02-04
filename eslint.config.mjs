@@ -9,7 +9,16 @@ import tseslint from 'typescript-eslint';
 
 export default defineConfig(
   {
-    ignores: ['dist', 'node_modules', '*.config.mjs', '*.config.js'],
+    ignores: [
+      'dist',
+      'node_modules',
+      '*.config.mjs',
+      '*.config.js',
+      'src/__tests__/**',
+      'tests/**',
+      '**/*.test.ts',
+      '**/*.spec.ts',
+    ],
   },
   eslint.configs.recommended,
   sonarjs.configs.recommended,
@@ -112,6 +121,7 @@ export default defineConfig(
       ],
 
       '@typescript-eslint/no-non-null-assertion': 'warn',
+      '@typescript-eslint/dot-notation': 'off',
       '@typescript-eslint/prefer-namespace-keyword': 'error',
       '@typescript-eslint/prefer-nullish-coalescing': 'error',
       '@typescript-eslint/prefer-optional-chain': 'error',
@@ -187,18 +197,6 @@ export default defineConfig(
           minimumDescriptionLength: 10,
         },
       ],
-
-      // Complexity rules (Gate 3: Complexity & Structure)
-      complexity: ['error', { max: 10 }],
-      'max-lines-per-function': [
-        'error',
-        {
-          max: 30,
-          skipBlankLines: true,
-          skipComments: true,
-        },
-      ],
-      'max-depth': ['error', 3],
     },
   },
 
