@@ -80,12 +80,16 @@ export interface RunDependencies {
   shutdownTimeoutMs?: number;
   readPackageJson?: (signal?: AbortSignal) => Promise<PackageInfo>;
   publishLifecycleEvent?: (event: LifecycleEvent) => void;
-  createServer?: (name: string, version: string) => ServerLike;
+  createServer?: (name: string, version: string, icon?: string) => ServerLike;
   connectServer?: (
     server: ServerLike,
     createTransport?: () => TransportLike
   ) => Promise<TransportLike>;
-  registerTool?: (server: ServerLike, engine: EngineLike) => void;
+  registerTool?: (
+    server: ServerLike,
+    engine: EngineLike,
+    icon?: string
+  ) => void;
   engineFactory?: () => EngineLike;
   installShutdownHandlers?: (deps: ShutdownDependencies) => void;
   now?: () => number;
@@ -97,12 +101,12 @@ export interface ResolvedRunDependencies {
   shutdownTimeoutMs?: number;
   readPackageJson: (signal?: AbortSignal) => Promise<PackageInfo>;
   publishLifecycleEvent: (event: LifecycleEvent) => void;
-  createServer: (name: string, version: string) => ServerLike;
+  createServer: (name: string, version: string, icon?: string) => ServerLike;
   connectServer: (
     server: ServerLike,
     createTransport?: () => TransportLike
   ) => Promise<TransportLike>;
-  registerTool: (server: ServerLike, engine: EngineLike) => void;
+  registerTool: (server: ServerLike, engine: EngineLike, icon?: string) => void;
   engineFactory: () => EngineLike;
   installShutdownHandlers: (deps: ShutdownDependencies) => void;
   now: () => number;
@@ -126,13 +130,22 @@ function buildServerCapabilities(
   };
 }
 
-const defaultCreateServer = (name: string, version: string): ServerLike => {
+const defaultCreateServer = (
+  name: string,
+  version: string,
+  icon?: string
+): ServerLike => {
   const capabilities = buildServerCapabilities();
   const server = new McpServer(
     { name, version },
     {
       instructions: SERVER_INSTRUCTIONS,
       capabilities,
+      ...(icon
+        ? {
+            icons: [{ src: icon, mimeType: 'image/svg+xml', sizes: ['any'] }],
+          }
+        : {}),
     }
   );
   registerInstructionsResource(server);

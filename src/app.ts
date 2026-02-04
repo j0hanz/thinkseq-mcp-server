@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import process from 'node:process';
 
 import type { RunDependencies } from './appConfig/runDependencies.js';
@@ -34,6 +35,19 @@ const createHandlerFor =
     exit(1);
   };
 
+function getLocalIconData(): string | undefined {
+  try {
+    const iconPath = new URL('../assets/logo.svg', import.meta.url);
+    const buffer = readFileSync(iconPath);
+    if (buffer.length > 2 * 1024 * 1024) {
+      console.warn('Warning: logo.svg is larger than 2MB');
+    }
+    return `data:image/svg+xml;base64,${buffer.toString('base64')}`;
+  } catch {
+    return undefined;
+  }
+}
+
 export function installProcessErrorHandlers(
   deps: ProcessErrorHandlerDeps = {}
 ): void {
@@ -53,7 +67,8 @@ export async function run(deps: RunDependencies = {}): Promise<void> {
   );
   const { name, version } = resolvePackageIdentity(pkg);
 
-  const server = resolved.createServer(name, version);
+  const localIcon = getLocalIconData();
+  const server = resolved.createServer(name, version, localIcon);
   installMcpLogging(server);
   const { flush: flushConsole, restore: restoreConsole } =
     installConsoleBridge(server);
@@ -65,7 +80,7 @@ export async function run(deps: RunDependencies = {}): Promise<void> {
   });
 
   const engine = resolved.engineFactory();
-  resolved.registerTool(server, engine);
+  resolved.registerTool(server, engine, localIcon);
 
   const transport = await resolved.connectServer(server);
   flushConsole();

@@ -293,9 +293,19 @@ async function handleThinkSeq(
 
 export function registerThinkSeq(
   server: ToolRegistrar,
-  engine: EngineLike
+  engine: EngineLike,
+  icon?: string
 ): void {
-  server.registerTool('thinkseq', THINKSEQ_TOOL_DEFINITION, (input, extra) =>
-    handleThinkSeq(engine, input, extra)
+  server.registerTool(
+    'thinkseq',
+    {
+      ...THINKSEQ_TOOL_DEFINITION,
+      ...(icon
+        ? {
+            icons: [{ src: icon, mimeType: 'image/svg+xml', sizes: ['any'] }],
+          }
+        : {}),
+    },
+    (input, extra) => handleThinkSeq(engine, input, extra)
   );
 }
