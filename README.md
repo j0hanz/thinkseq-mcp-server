@@ -1,6 +1,6 @@
 # ThinkSeq MCP Server
 
-<img src="docs/logo.png" alt="ThinkSeq MCP Server Logo" width="175" />
+<img src="assets/logo.svg" alt="ThinkSeq MCP Server Logo" width="175" />
 
 An MCP server for structured, sequential thinking with revision support.
 
