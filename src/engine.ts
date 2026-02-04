@@ -1,3 +1,5 @@
+import { Buffer } from 'node:buffer';
+
 import { resolveRevisionTarget } from './engine/revision.js';
 import { buildContextSummary } from './engine/thoughtQueries.js';
 import { ThoughtStore } from './engine/thoughtStore.js';

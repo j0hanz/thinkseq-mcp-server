@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import process from 'node:process';
+
 import { installProcessErrorHandlers, run } from './app.js';
 import type { RunDependencies } from './appConfig/runDependencies.js';
 import { ThinkingEngine } from './engine.js';

@@ -1,3 +1,5 @@
+import process from 'node:process';
+
 import type { RunDependencies } from './appConfig/runDependencies.js';
 import {
   resolvePackageIdentity,
