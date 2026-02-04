@@ -15,14 +15,14 @@ export interface PruneStats {
 }
 
 export class ThoughtStore {
-  #thoughts: StoredThought[] = [];
-  #thoughtIndex = new Map<number, StoredThought>();
+  #allThoughts: StoredThought[] = [];
+  #byNumber = new Map<number, StoredThought>();
   #activeThoughts: StoredThought[] = [];
-  #activeThoughtNumbers: number[] = [];
+  #activeNumbers: number[] = [];
   #activeMaxTotalThoughts = 0;
-  #headIndex = 0;
+  #startIndex = 0;
   #nextThoughtNumber = 1;
-  #estimatedBytes = 0;
+  #approxBytes = 0;
   #lastPruneStats: PruneStats | null = null;
   readonly #maxThoughts: number;
   readonly #maxMemoryBytes: number;
@@ -40,6 +40,7 @@ export class ThoughtStore {
   } {
     const thoughtNumber = this.#nextThoughtNumber;
     this.#nextThoughtNumber += 1;
+
     const effectiveTotalThoughts = Math.max(
       totalThoughts,
       this.#activeMaxTotalThoughts
@@ -52,57 +53,14 @@ export class ThoughtStore {
   }
 
   storeThought(stored: StoredThought): void {
-    this.#thoughts.push(stored);
-    this.#thoughtIndex.set(stored.thoughtNumber, stored);
+    this.#allThoughts.push(stored);
+    this.#byNumber.set(stored.thoughtNumber, stored);
+
     if (stored.isActive) {
-      this.#activeThoughts.push(stored);
-      this.#activeThoughtNumbers.push(stored.thoughtNumber);
-      this.#activeMaxTotalThoughts = Math.max(
-        this.#activeMaxTotalThoughts,
-        stored.totalThoughts
-      );
+      this.#appendActive(stored);
     }
-    this.#estimatedBytes += this.#estimateThoughtBytes(stored);
-  }
 
-  #recomputeActiveMaxTotalThoughts(): void {
-    let maxTotal = 0;
-    for (const thought of this.#activeThoughts) {
-      maxTotal = Math.max(maxTotal, thought.totalThoughts);
-    }
-    this.#activeMaxTotalThoughts = maxTotal;
-  }
-
-  #findActiveLowerBound(thoughtNumber: number): number {
-    const activeThoughtNumbers = this.#activeThoughtNumbers;
-    let low = 0;
-    let high = activeThoughtNumbers.length;
-    while (low < high) {
-      const mid = (low + high) >>> 1;
-      const midValue = activeThoughtNumbers[mid];
-      if (midValue === undefined) return -1;
-      if (midValue < thoughtNumber) low = mid + 1;
-      else high = mid;
-    }
-    return low;
-  }
-
-  #findActiveThoughtIndex(thoughtNumber: number): number {
-    const index = this.#findActiveLowerBound(thoughtNumber);
-    if (index < 0) return -1;
-    if (
-      index < this.#activeThoughtNumbers.length &&
-      this.#activeThoughtNumbers[index] === thoughtNumber
-    )
-      return index;
-    return -1;
-  }
-
-  #findFirstActiveIndexAfter(thoughtNumber: number): number {
-    const index = this.#findActiveLowerBound(thoughtNumber);
-    if (index < 0) return 0;
-    if (this.#activeThoughtNumbers[index] === thoughtNumber) return index + 1;
-    return index;
+    this.#approxBytes += this.#estimateThoughtBytes(stored);
   }
 
   supersedeFrom(
@@ -110,25 +68,29 @@ export class ThoughtStore {
     supersededBy: number,
     maxSupersedes?: number
   ): { supersedes: number[]; supersedesTotal: number } {
-    const startIndex = this.#findActiveThoughtIndex(targetNumber);
+    const startIndex = this.#findActiveIndex(targetNumber);
     if (startIndex < 0) return { supersedes: [], supersedesTotal: 0 };
+
     const supersedes: number[] = [];
     let supersedesTotal = 0;
+
     for (let i = startIndex; i < this.#activeThoughts.length; i += 1) {
       const thought = this.#activeThoughts[i];
       if (!thought) continue;
-      if (thought.isActive) {
-        thought.isActive = false;
-        thought.supersededBy = supersededBy;
-      }
+
+      this.#markSuperseded(thought, supersededBy);
       supersedesTotal += 1;
+
       if (maxSupersedes === undefined || supersedes.length < maxSupersedes) {
         supersedes.push(thought.thoughtNumber);
       }
     }
+
+    // Drop superseded suffix from active arrays.
     this.#activeThoughts.length = startIndex;
-    this.#activeThoughtNumbers.length = startIndex;
+    this.#activeNumbers.length = startIndex;
     this.#recomputeActiveMaxTotalThoughts();
+
     return { supersedes, supersedesTotal };
   }
 
@@ -137,22 +99,18 @@ export class ThoughtStore {
   }
 
   getActiveThoughtNumbers(max?: number): number[] {
-    if (max === undefined) {
-      return this.#activeThoughtNumbers.slice();
-    }
+    if (max === undefined) return this.#activeNumbers.slice();
     if (max <= 0) return [];
-    if (this.#activeThoughtNumbers.length <= max) {
-      return this.#activeThoughtNumbers.slice();
-    }
-    return this.#activeThoughtNumbers.slice(-max);
+    if (this.#activeNumbers.length <= max) return this.#activeNumbers.slice();
+    return this.#activeNumbers.slice(-max);
   }
 
   getThoughtByNumber(thoughtNumber: number): StoredThought | undefined {
-    return this.#thoughtIndex.get(thoughtNumber);
+    return this.#byNumber.get(thoughtNumber);
   }
 
   getTotalLength(): number {
-    return this.#thoughts.length - this.#headIndex;
+    return this.#allThoughts.length - this.#startIndex;
   }
 
   pruneHistoryIfNeeded(): void {
@@ -164,12 +122,82 @@ export class ThoughtStore {
       droppedActiveCount: 0,
       removedThoughtsCount: 0,
       oldestAvailableThoughtNumber:
-        this.#thoughts[this.#headIndex]?.thoughtNumber ?? null,
+        this.#allThoughts[this.#startIndex]?.thoughtNumber ?? null,
     };
 
     this.#performPruning();
     this.#updatePruneStats(beforeTotal, beforeActive);
   }
+
+  // -------------------------
+  // Active-path bookkeeping
+  // -------------------------
+
+  #appendActive(stored: StoredThought): void {
+    this.#activeThoughts.push(stored);
+    this.#activeNumbers.push(stored.thoughtNumber);
+    this.#activeMaxTotalThoughts = Math.max(
+      this.#activeMaxTotalThoughts,
+      stored.totalThoughts
+    );
+  }
+
+  #markSuperseded(thought: StoredThought, supersededBy: number): void {
+    if (!thought.isActive) return;
+    thought.isActive = false;
+    thought.supersededBy = supersededBy;
+  }
+
+  #recomputeActiveMaxTotalThoughts(): void {
+    let maxTotal = 0;
+    for (const thought of this.#activeThoughts) {
+      maxTotal = Math.max(maxTotal, thought.totalThoughts);
+    }
+    this.#activeMaxTotalThoughts = maxTotal;
+  }
+
+  // Binary search lower bound for activeNumbers
+  #lowerBoundActive(thoughtNumber: number): number {
+    let low = 0;
+    let high = this.#activeNumbers.length;
+
+    while (low < high) {
+      const mid = (low + high) >>> 1;
+      const midValue = this.#activeNumbers[mid];
+      if (midValue === undefined) return -1;
+      if (midValue < thoughtNumber) low = mid + 1;
+      else high = mid;
+    }
+
+    return low;
+  }
+
+  #findActiveIndex(thoughtNumber: number): number {
+    const index = this.#lowerBoundActive(thoughtNumber);
+    if (index < 0) return -1;
+    return this.#activeNumbers[index] === thoughtNumber ? index : -1;
+  }
+
+  #firstActiveIndexAfter(thoughtNumber: number): number {
+    const index = this.#lowerBoundActive(thoughtNumber);
+    if (index < 0) return 0;
+    return this.#activeNumbers[index] === thoughtNumber ? index + 1 : index;
+  }
+
+  #dropActiveUpTo(thoughtNumber: number): void {
+    if (this.#activeThoughts.length === 0) return;
+
+    const startIndex = this.#firstActiveIndexAfter(thoughtNumber);
+    if (startIndex === 0) return;
+
+    this.#activeThoughts = this.#activeThoughts.slice(startIndex);
+    this.#activeNumbers = this.#activeNumbers.slice(startIndex);
+    this.#recomputeActiveMaxTotalThoughts();
+  }
+
+  // -------------------------
+  // Pruning / compaction
+  // -------------------------
 
   #performPruning(): void {
     const excess = this.getTotalLength() - this.#maxThoughts;
@@ -177,8 +205,9 @@ export class ThoughtStore {
       const batch = Math.max(excess, Math.ceil(this.#maxThoughts * 0.1));
       this.#removeOldest(batch);
     }
+
     if (
-      this.#estimatedBytes > this.#maxMemoryBytes &&
+      this.#approxBytes > this.#maxMemoryBytes &&
       this.getTotalLength() > 10
     ) {
       const toRemove = Math.ceil(this.getTotalLength() * 0.2);
@@ -187,9 +216,10 @@ export class ThoughtStore {
   }
 
   #updatePruneStats(beforeTotal: number, beforeActive: number): void {
-    if (!this.#lastPruneStats) return;
-    const afterActive = this.#activeThoughts.length;
     const stats = this.#lastPruneStats;
+    if (!stats) return;
+
+    const afterActive = this.#activeThoughts.length;
 
     stats.removedThoughtsCount = Math.max(
       0,
@@ -198,20 +228,11 @@ export class ThoughtStore {
     stats.droppedActiveCount = Math.max(0, beforeActive - afterActive);
     stats.truncatedActive = stats.droppedActiveCount > 0;
     stats.oldestAvailableThoughtNumber =
-      this.#thoughts[this.#headIndex]?.thoughtNumber ?? null;
+      this.#allThoughts[this.#startIndex]?.thoughtNumber ?? null;
   }
 
   #estimateThoughtBytes(thought: StoredThought): number {
     return thought.byteLength + this.#estimatedThoughtOverheadBytes;
-  }
-
-  #dropActiveThoughtsUpTo(thoughtNumber: number): void {
-    if (this.#activeThoughts.length === 0) return;
-    const startIndex = this.#findFirstActiveIndexAfter(thoughtNumber);
-    if (startIndex === 0) return;
-    this.#activeThoughts = this.#activeThoughts.slice(startIndex);
-    this.#activeThoughtNumbers = this.#activeThoughtNumbers.slice(startIndex);
-    this.#recomputeActiveMaxTotalThoughts();
   }
 
   #removeOldest(count: number, options: { forceCompact?: boolean } = {}): void {
@@ -219,18 +240,20 @@ export class ThoughtStore {
     if (count <= 0 || totalLength === 0) return;
 
     const actual = Math.min(count, totalLength);
-    const start = this.#headIndex;
+    const start = this.#startIndex;
     const end = start + actual;
 
     const removedMaxThoughtNumber = this.#evictRange(start, end);
 
-    this.#headIndex = end;
+    this.#startIndex = end;
+
     if (this.getTotalLength() === 0) {
-      this.#resetThoughts();
+      this.#reset();
       return;
     }
+
     if (removedMaxThoughtNumber >= 0) {
-      this.#dropActiveThoughtsUpTo(removedMaxThoughtNumber);
+      this.#dropActiveUpTo(removedMaxThoughtNumber);
     }
 
     this.#compactIfNeeded(options.forceCompact);
@@ -241,48 +264,48 @@ export class ThoughtStore {
     let maxThoughtNumber = -1;
 
     for (let index = start; index < end; index += 1) {
-      const thought = this.#thoughts[index];
+      const thought = this.#allThoughts[index];
       if (!thought) continue;
 
       removedBytes += this.#estimateThoughtBytes(thought);
-      this.#thoughtIndex.delete(thought.thoughtNumber);
+      this.#byNumber.delete(thought.thoughtNumber);
       maxThoughtNumber = thought.thoughtNumber;
     }
 
-    this.#estimatedBytes -= removedBytes;
+    this.#approxBytes -= removedBytes;
     return maxThoughtNumber;
   }
 
   #compactIfNeeded(force = false): void {
-    if (this.#headIndex === 0) return;
+    if (this.#startIndex === 0) return;
+
     if (this.getTotalLength() === 0) {
-      this.#resetThoughts();
-      return;
-    }
-    if (!force && !this.#shouldCompact()) {
+      this.#reset();
       return;
     }
 
-    this.#thoughts = this.#thoughts.slice(this.#headIndex);
-    this.#headIndex = 0;
+    if (!force && !this.#shouldCompact()) return;
+
+    this.#allThoughts = this.#allThoughts.slice(this.#startIndex);
+    this.#startIndex = 0;
   }
 
   #shouldCompact(): boolean {
     return (
-      this.#headIndex >= COMPACT_THRESHOLD ||
-      this.#headIndex >= this.#thoughts.length * COMPACT_RATIO
+      this.#startIndex >= COMPACT_THRESHOLD ||
+      this.#startIndex >= this.#allThoughts.length * COMPACT_RATIO
     );
   }
 
-  #resetThoughts(): void {
-    this.#thoughts = [];
-    this.#thoughtIndex.clear();
+  #reset(): void {
+    this.#allThoughts = [];
+    this.#byNumber.clear();
     this.#activeThoughts = [];
-    this.#activeThoughtNumbers = [];
+    this.#activeNumbers = [];
     this.#activeMaxTotalThoughts = 0;
-    this.#headIndex = 0;
+    this.#startIndex = 0;
     this.#nextThoughtNumber = 1;
-    this.#estimatedBytes = 0;
+    this.#approxBytes = 0;
     this.#lastPruneStats = null;
   }
 }

@@ -8,14 +8,20 @@ const MAX_PREVIEW_CHARS = 100;
 const MAX_RECENT_THOUGHTS = 5;
 const RECENT_TAIL_COUNT = 4;
 
-function selectRecentThoughts(activeThoughts: readonly StoredThought[]): {
+interface RecentSelection {
   recent: StoredThought[];
   stepIndexes: number[];
-} {
+}
+
+function selectRecentThoughts(
+  activeThoughts: readonly StoredThought[]
+): RecentSelection {
   const len = activeThoughts.length;
+
   const recent: StoredThought[] = [];
   const stepIndexes: number[] = [];
 
+  // If we have lots of thoughts, keep the first as an anchor.
   if (len > MAX_RECENT_THOUGHTS) {
     const anchor = activeThoughts[0];
     if (!anchor) throw new Error('Invariant violation: anchor thought missing');
@@ -23,19 +29,22 @@ function selectRecentThoughts(activeThoughts: readonly StoredThought[]): {
     stepIndexes.push(1);
   }
 
-  const start =
+  const startIndex =
     len <= MAX_RECENT_THOUGHTS ? 0 : Math.max(0, len - RECENT_TAIL_COUNT);
-  for (let i = start; i < len; i += 1) {
+
+  for (let i = startIndex; i < len; i += 1) {
     const thought = activeThoughts[i];
-    if (thought) {
-      recent.push(thought);
-      stepIndexes.push(i + 1);
-    }
+    if (!thought) continue;
+
+    recent.push(thought);
+    stepIndexes.push(i + 1);
   }
+
   return { recent, stepIndexes };
 }
 
 function truncatePreview(input: string, maxChars: number): string {
+  // Preserve codepoint boundaries (emoji-safe) without depending on Intl.Segmenter.
   const codepoints = Array.from(input);
   if (codepoints.length <= maxChars) return input;
   return `${codepoints.slice(0, maxChars).join('')}...`;
@@ -53,8 +62,5 @@ export function buildContextSummary(
     preview: truncatePreview(thought.thought, MAX_PREVIEW_CHARS),
   }));
 
-  if (revisionInfo !== undefined) {
-    return { recentThoughts, revisionInfo };
-  }
-  return { recentThoughts };
+  return revisionInfo ? { recentThoughts, revisionInfo } : { recentThoughts };
 }
