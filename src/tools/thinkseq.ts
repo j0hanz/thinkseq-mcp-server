@@ -9,6 +9,7 @@ import type {
 
 import type { z } from 'zod';
 
+import { APP_ENV } from '../appConfig/env.js';
 import { runWithContext } from '../lib/context.js';
 import { publishToolEvent } from '../lib/diagnostics.js';
 import type { ErrorResponse } from '../lib/errors.js';
@@ -16,13 +17,6 @@ import { createErrorResponse, getErrorMessage } from '../lib/errors.js';
 import type { EngineLike, ProcessResult, ThoughtData } from '../lib/types.js';
 import { ThinkSeqInputSchema } from '../schemas/inputs.js';
 import { ThinkSeqOutputSchema } from '../schemas/outputs.js';
-
-function resolveIncludeTextContent(): boolean {
-  const raw = process.env.THINKSEQ_INCLUDE_TEXT_CONTENT;
-  return raw === undefined || !FALSY_ENV_VALUES.has(raw.trim().toLowerCase());
-}
-
-const FALSY_ENV_VALUES = new Set(['0', 'false', 'no', 'off']);
 
 const THINKSEQ_TOOL_DEFINITION = {
   title: 'Think Sequentially',
@@ -284,7 +278,7 @@ async function handleThinkSeq(
     requestId === undefined ? undefined : { requestId: String(requestId) };
 
   return runWithContext(async () => {
-    const includeTextContent = resolveIncludeTextContent();
+    const includeTextContent = APP_ENV.INCLUDE_TEXT_CONTENT;
     const normalized = buildThoughtData(input);
     const sessionId = resolveSessionId(input, extra);
     return processThoughtWithTiming(
