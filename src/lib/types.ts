@@ -63,7 +63,13 @@ export type ProcessThought = (
   input: ThoughtData
 ) => ProcessResult | Promise<ProcessResult>;
 
+export type ProcessThoughtWithSession = (
+  sessionId: string,
+  input: ThoughtData
+) => ProcessResult | Promise<ProcessResult>;
+
 export interface EngineLike {
   processThought: ProcessThought;
+  processThoughtWithSession?: ProcessThoughtWithSession;
   close?: CloseFn;
 }

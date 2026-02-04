@@ -38,8 +38,7 @@ function readInstructionsText(): string {
   }
 }
 
-function loadServerInstructions(): string {
-  const raw = readInstructionsText();
+function loadServerInstructions(raw: string): string {
   const trimmed = raw.trim();
   return trimmed.length > 0 ? trimmed : INSTRUCTIONS_FALLBACK;
 }
@@ -63,7 +62,7 @@ function registerInstructionsResource(server: ServerLike): void {
       contents: [
         {
           uri: uri.href,
-          text: readInstructionsText(),
+          text: INSTRUCTIONS_TEXT,
           mimeType: 'text/markdown',
         },
       ],
@@ -71,7 +70,8 @@ function registerInstructionsResource(server: ServerLike): void {
   );
 }
 
-const SERVER_INSTRUCTIONS = loadServerInstructions();
+const INSTRUCTIONS_TEXT = readInstructionsText();
+const SERVER_INSTRUCTIONS = loadServerInstructions(INSTRUCTIONS_TEXT);
 const DEFAULT_PACKAGE_READ_TIMEOUT_MS = 2000;
 
 export interface RunDependencies {

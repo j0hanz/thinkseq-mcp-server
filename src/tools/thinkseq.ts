@@ -197,15 +197,8 @@ async function processThoughtWithTiming(
   void sendProgress(extra, 0, 'started');
 
   try {
-    const sessionEngine = engine as {
-      processThoughtWithSession?: (
-        id: string,
-        d: ThoughtData
-      ) => ProcessResult | Promise<ProcessResult>;
-    };
-
-    const result = await (sessionEngine.processThoughtWithSession
-      ? sessionEngine.processThoughtWithSession(sessionId, normalized)
+    const result = await (engine.processThoughtWithSession
+      ? engine.processThoughtWithSession(sessionId, normalized)
       : engine.processThought(normalized));
 
     const durationMs = getDurationMs(start);

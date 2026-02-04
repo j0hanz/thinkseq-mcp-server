@@ -45,9 +45,18 @@ function selectRecentThoughts(
 
 function truncatePreview(input: string, maxChars: number): string {
   // Preserve codepoint boundaries (emoji-safe) without depending on Intl.Segmenter.
-  const codepoints = Array.from(input);
-  if (codepoints.length <= maxChars) return input;
-  return `${codepoints.slice(0, maxChars).join('')}...`;
+  const iterator = input[Symbol.iterator]();
+  const preview: string[] = [];
+
+  for (let i = 0; i < maxChars; i += 1) {
+    const next = iterator.next();
+    if (next.done) return input;
+    preview.push(next.value);
+  }
+
+  const extra = iterator.next();
+  if (extra.done) return input;
+  return `${preview.join('')}...`;
 }
 
 export function buildContextSummary(
