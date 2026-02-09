@@ -95,6 +95,7 @@ function buildToolResponse(result: ProcessResult): ToolResponse {
     ok: true,
     result: {
       ...result.result,
+      revisableThoughts: [...result.result.revisableThoughts],
       context: {
         ...result.result.context,
         recentThoughts: [...result.result.context.recentThoughts],

@@ -98,7 +98,7 @@ export class ThoughtStore {
     return this.#activeThoughts;
   }
 
-  getActiveThoughtNumbers(max?: number): number[] {
+  getActiveThoughtNumbers(max?: number): readonly number[] {
     if (max === undefined) return this.#activeNumbers.slice();
     if (max <= 0) return [];
     if (this.#activeNumbers.length <= max) return this.#activeNumbers.slice();

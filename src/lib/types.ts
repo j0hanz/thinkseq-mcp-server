@@ -42,7 +42,7 @@ export type ProcessResult =
         thoughtHistoryLength: number;
         hasRevisions: boolean;
         activePathLength: number;
-        revisableThoughts: number[];
+        revisableThoughts: readonly number[];
         revisableThoughtsTotal: number;
         context: ContextSummary;
       };

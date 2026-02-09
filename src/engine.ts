@@ -62,23 +62,21 @@ class PinnedLruSessions<T> {
   }
 
   #evictIfNeeded(): void {
-    while (this.#map.size > this.#max) {
-      const oldestKey: string | undefined = this.#map.keys().next().value;
-      if (!oldestKey) return;
+    if (this.#map.size <= this.#max) return;
 
-      if (oldestKey === this.#pinnedKey) {
+    for (const key of this.#map.keys()) {
+      if (this.#map.size <= this.#max) break;
+
+      if (key === this.#pinnedKey) {
         const pinned = this.#map.get(this.#pinnedKey);
-        if (!pinned) {
-          // Invariant broken; safest is to stop evicting.
-          return;
+        if (pinned) {
+          this.#map.delete(this.#pinnedKey);
+          this.#map.set(this.#pinnedKey, pinned);
         }
-        // Move pinned to most-recent and try again.
-        this.#map.delete(this.#pinnedKey);
-        this.#map.set(this.#pinnedKey, pinned);
         continue;
       }
 
-      this.#map.delete(oldestKey);
+      this.#map.delete(key);
     }
   }
 }
