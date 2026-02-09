@@ -1,3 +1,4 @@
+import { runWithContext } from '../lib/context.js';
 import { publishLifecycleEvent } from '../lib/diagnostics.js';
 import type { LifecycleEvent } from '../lib/diagnostics.js';
 import type { ResolvedRunDependencies } from './runDependencies.js';
@@ -59,11 +60,16 @@ function buildShutdownRunner(
   return async (signal: string): Promise<void> => {
     if (shuttingDown) return;
     shuttingDown = true;
-    emit({
-      type: 'lifecycle.shutdown',
-      ts: timestamp(),
-      signal,
-    });
+    runWithContext(
+      () => {
+        emit({
+          type: 'lifecycle.shutdown',
+          ts: timestamp(),
+          signal,
+        });
+      },
+      { requestId: `lifecycle.shutdown:${signal}` }
+    );
     await closeAllWithinTimeout(
       [deps.server, deps.engine, deps.transport],
       timeoutMs

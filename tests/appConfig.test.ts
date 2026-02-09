@@ -162,7 +162,12 @@ void describe('appConfig.shutdown helpers', () => {
 
   void it('handles shutdown, closes resources, and ignores errors', async () => {
     const proc = createProcessStub();
-    const events: Array<{ type: string; ts: number; signal: string }> = [];
+    const events: Array<{
+      type: string;
+      ts: number;
+      signal: string;
+      context?: unknown;
+    }> = [];
     const closes: string[] = [];
 
     const deps: ShutdownDependencies = {
@@ -204,9 +209,12 @@ void describe('appConfig.shutdown helpers', () => {
     await waitFor(() => proc.exitCodes.length > 0);
 
     assert.deepStrictEqual(proc.exitCodes, [0]);
-    assert.deepStrictEqual(events, [
-      { type: 'lifecycle.shutdown', ts: 123, signal: 'SIGTERM' },
-    ]);
+    assert.equal(events.length, 1);
+    const event = events[0];
+    assert.ok(event);
+    assert.equal(event.type, 'lifecycle.shutdown');
+    assert.equal(event.ts, 123);
+    assert.equal(event.signal, 'SIGTERM');
     assert.ok(closes.includes('server'));
     assert.ok(closes.includes('engine'));
     assert.ok(closes.includes('transport'));

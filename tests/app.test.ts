@@ -79,7 +79,11 @@ void describe('app.run', () => {
     await run(buildRunDependencies(state));
 
     assert.ok(state.seenSignal);
-    assert.deepEqual(state.events, [{ type: 'lifecycle.started', ts: 42 }]);
+    assert.equal(state.events.length, 1);
+    const event = state.events[0];
+    assert.ok(event);
+    assert.equal(event.type, 'lifecycle.started');
+    assert.equal(event.ts, 42);
     assert.deepEqual(state.calls, [
       'create:thinkseq:0.0.0',
       'register',

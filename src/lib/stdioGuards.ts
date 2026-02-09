@@ -1,5 +1,7 @@
 import { ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 
+import { getRequestContext, runWithContext } from './context.js';
+
 interface StdioMessageTransportLike {
   onmessage?: (message: unknown, extra?: unknown) => void;
   send?: (message: unknown) => Promise<void>;
@@ -62,6 +64,31 @@ function parseJsonRpcResponse(
   if (!hasResult && !hasError) return undefined;
   const { error } = message;
   return { id, error: hasError ? error : undefined };
+}
+
+function resolveMessageRequestId(message: unknown): string | undefined {
+  const methodMessage = parseJsonRpcMethodMessage(message);
+  if (methodMessage?.hasId && methodMessage.id !== null) {
+    return String(methodMessage.id);
+  }
+  const response = parseJsonRpcResponse(message);
+  if (response && response.id !== null) {
+    return String(response.id);
+  }
+  return undefined;
+}
+
+function withMessageContext(message: unknown, handler: () => void): void {
+  if (getRequestContext()) {
+    handler();
+    return;
+  }
+  const requestId = resolveMessageRequestId(message);
+  if (requestId) {
+    runWithContext(handler, { requestId });
+    return;
+  }
+  runWithContext(handler);
 }
 
 function getIdKey(id: JsonRpcId): string {
@@ -164,30 +191,32 @@ function createInitGuardHandler(
   transport: StdioMessageTransportLike
 ): (message: unknown, extra?: unknown) => void {
   return (message: unknown, extra?: unknown) => {
-    const methodMessage = parseJsonRpcMethodMessage(message);
-    if (!methodMessage) {
+    withMessageContext(message, () => {
+      const methodMessage = parseJsonRpcMethodMessage(message);
+      if (!methodMessage) {
+        originalOnMessage(message, extra);
+        return;
+      }
+
+      if (methodMessage.method === 'initialize') {
+        if (!methodMessage.hasId) return;
+        handleInitializeMethod(
+          methodMessage,
+          state,
+          originalOnMessage,
+          message,
+          extra
+        );
+        return;
+      }
+
+      if (!state.sawInitialize) {
+        handleNonInitializedRequest(methodMessage, transport);
+        return;
+      }
+
       originalOnMessage(message, extra);
-      return;
-    }
-
-    if (methodMessage.method === 'initialize') {
-      if (!methodMessage.hasId) return;
-      handleInitializeMethod(
-        methodMessage,
-        state,
-        originalOnMessage,
-        message,
-        extra
-      );
-      return;
-    }
-
-    if (!state.sawInitialize) {
-      handleNonInitializedRequest(methodMessage, transport);
-      return;
-    }
-
-    originalOnMessage(message, extra);
+    });
   };
 }
 
@@ -218,14 +247,16 @@ export function installStdioInvalidMessageGuards(transport: unknown): void {
   if (!originalOnMessage) return;
 
   transport.onmessage = (message: unknown, extra?: unknown) => {
-    // MCP stdio is line-delimited JSON-RPC (one object per line). JSON-RPC
-    // batching is removed in newer revisions; treat arrays as invalid.
-    if (isInvalidJsonRpcMessageShape(message)) {
-      sendError(transport, ErrorCode.InvalidRequest, 'Invalid Request');
-      return;
-    }
+    withMessageContext(message, () => {
+      // MCP stdio is line-delimited JSON-RPC (one object per line). JSON-RPC
+      // batching is removed in newer revisions; treat arrays as invalid.
+      if (isInvalidJsonRpcMessageShape(message)) {
+        sendError(transport, ErrorCode.InvalidRequest, 'Invalid Request');
+        return;
+      }
 
-    originalOnMessage(message, extra);
+      originalOnMessage(message, extra);
+    });
   };
 }
 

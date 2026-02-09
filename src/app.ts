@@ -8,6 +8,7 @@ import {
 } from './appConfig/runDependencies.js';
 import { buildShutdownDependencies } from './appConfig/shutdown.js';
 import type { ProcessLike } from './appConfig/types.js';
+import { runWithContext } from './lib/context.js';
 import { installConsoleBridge, installMcpLogging } from './lib/mcpLogging.js';
 
 interface ProcessErrorHandlerDeps {
@@ -74,10 +75,15 @@ export async function run(deps: RunDependencies = {}): Promise<void> {
     installConsoleBridge(server);
   process.on('exit', restoreConsole);
 
-  resolved.publishLifecycleEvent({
-    type: 'lifecycle.started',
-    ts: resolved.now(),
-  });
+  runWithContext(
+    () => {
+      resolved.publishLifecycleEvent({
+        type: 'lifecycle.started',
+        ts: resolved.now(),
+      });
+    },
+    { requestId: 'lifecycle.started' }
+  );
 
   const engine = resolved.engineFactory();
   resolved.registerTool(server, engine, localIcon);
