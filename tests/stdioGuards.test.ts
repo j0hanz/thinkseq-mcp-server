@@ -103,7 +103,7 @@ void describe('stdioGuards.installStdioInitializationGuards', () => {
     assert.equal(transport.seen.length, 1);
   });
 
-  void it('allows requests after a successful initialize response', async () => {
+  void it('allows requests after notifications/initialized', async () => {
     const transport = createTransport();
 
     installStdioInitializationGuards(transport);
@@ -130,10 +130,21 @@ void describe('stdioGuards.installStdioInitializationGuards', () => {
       method: 'tools/list',
     });
 
+    transport.onmessage({
+      jsonrpc: '2.0',
+      method: 'notifications/initialized',
+    });
+
+    transport.onmessage({
+      jsonrpc: '2.0',
+      id: 4,
+      method: 'tools/list',
+    });
+
     await Promise.resolve();
 
-    assert.equal(transport.sent.length, 2);
-    assert.equal(transport.seen.length, 2);
+    assert.equal(transport.sent.length, 3);
+    assert.equal(transport.seen.length, 3);
   });
 });
 

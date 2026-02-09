@@ -31,10 +31,10 @@ _Do NOT repeat JSON schema. Focus on behavior and pitfalls._
 
 - **`thinkseq`**
   - **Purpose:** Append or revise a thought in the current session.
-  - **Inputs:** `thought` (1–8000 chars), `totalThoughts` (1–25), `revisesThought` (int ≥ 1).
+  - **Inputs:** `thought` (1–8000 chars), `totalThoughts` (1–25), `revisesThought` (int >= 1).
   - **Side effects:** Mutates in-memory thought history; revisions supersede the target and later active thoughts (destructive rewind).
   - **Defaults:** If `totalThoughts` is omitted, the engine uses 3 or the last active total.
-  - **Compatibility:** Set `THINKSEQ_INCLUDE_TEXT_CONTENT=0` env var to omit JSON string content if needed.
+  - **Compatibility:** Tool responses include JSON string content alongside structured content.
 
 ## 4. Error Handling Strategy
 

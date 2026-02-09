@@ -236,7 +236,12 @@ void describe('stdio black-box regression', () => {
     assert.equal(tools.listChanged, true);
     assert.ok(capabilities.logging && typeof capabilities.logging === 'object');
 
-    // 6) tools/list now succeeds
+    // 6) notifications/initialized before other requests
+    server.sendRaw(
+      JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' })
+    );
+
+    // 7) tools/list now succeeds
     server.sendRaw(JSON.stringify(buildRequest(5, 'tools/list')));
     const postInitToolsList = await server.waitForResponse(5);
     assert.ok(!postInitToolsList.error);

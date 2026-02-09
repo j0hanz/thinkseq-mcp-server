@@ -9,7 +9,6 @@ import type {
 
 import type { z } from 'zod';
 
-import { APP_ENV } from '../appConfig/env.js';
 import { runWithContext } from '../lib/context.js';
 import { publishToolEvent } from '../lib/diagnostics.js';
 import type { ErrorResponse } from '../lib/errors.js';
@@ -85,24 +84,13 @@ function finalizeToolEvent(
   void sendProgress(extra, 1, 'failed');
 }
 
-function buildErrorResponse(
-  code: string,
-  message: string,
-  includeTextContent: boolean
-): ToolResponse {
-  return createErrorResponse(code, message, undefined, { includeTextContent });
+function buildErrorResponse(code: string, message: string): ToolResponse {
+  return createErrorResponse(code, message);
 }
 
-function buildToolResponse(
-  result: ProcessResult,
-  options: { includeTextContent: boolean }
-): ToolResponse {
+function buildToolResponse(result: ProcessResult): ToolResponse {
   if (!result.ok)
-    return buildErrorResponse(
-      result.error.code,
-      result.error.message,
-      options.includeTextContent
-    );
+    return buildErrorResponse(result.error.code, result.error.message);
   const structured: ThinkSeqOutput = {
     ok: true,
     result: {
@@ -114,9 +102,7 @@ function buildToolResponse(
     },
   };
   return {
-    content: options.includeTextContent
-      ? [{ type: 'text', text: JSON.stringify(structured) }]
-      : [],
+    content: [{ type: 'text', text: JSON.stringify(structured) }],
     structuredContent: structured,
   };
 }
@@ -189,8 +175,7 @@ async function processThoughtWithTiming(
   engine: EngineLike,
   sessionId: string,
   normalized: ThoughtData,
-  extra: ToolExtra | undefined,
-  includeTextContent: boolean
+  extra: ToolExtra | undefined
 ): Promise<ToolResponse> {
   publishToolEvent({ type: 'tool.start', tool: 'thinkseq', ts: Date.now() });
   const start = performance.now();
@@ -203,9 +188,9 @@ async function processThoughtWithTiming(
 
     const durationMs = getDurationMs(start);
     handleThoughtResult(result, durationMs, extra);
-    return buildToolResponse(result, { includeTextContent });
+    return buildToolResponse(result);
   } catch (err) {
-    return handleThoughtError(err, start, extra, includeTextContent);
+    return handleThoughtError(err, start, extra);
   }
 }
 
@@ -236,8 +221,7 @@ function handleThoughtResult(
 function handleThoughtError(
   err: unknown,
   start: number,
-  extra: ToolExtra | undefined,
-  includeTextContent: boolean
+  extra: ToolExtra | undefined
 ): ToolResponse {
   const errorMessage = getErrorMessage(err);
   const durationMs = getDurationMs(start);
@@ -246,7 +230,7 @@ function handleThoughtError(
     durationMs,
     extra
   );
-  return buildErrorResponse('E_THINK', errorMessage, includeTextContent);
+  return buildErrorResponse('E_THINK', errorMessage);
 }
 
 function buildThoughtData(input: ThinkSeqInput): ThoughtData {
@@ -271,16 +255,9 @@ async function handleThinkSeq(
     requestId === undefined ? undefined : { requestId: String(requestId) };
 
   return runWithContext(async () => {
-    const includeTextContent = APP_ENV.INCLUDE_TEXT_CONTENT;
     const normalized = buildThoughtData(input);
     const sessionId = resolveSessionId(input, extra);
-    return processThoughtWithTiming(
-      engine,
-      sessionId,
-      normalized,
-      extra,
-      includeTextContent
-    );
+    return processThoughtWithTiming(engine, sessionId, normalized, extra);
   }, context);
 }
 

@@ -11,6 +11,9 @@ interface StdioMessageTransportLike {
 type JsonRpcId = number | string | null;
 
 const INIT_FIRST_ERROR_MESSAGE = 'initialize must be the first request';
+const INITIALIZED_NOTIFICATION_METHOD = 'notifications/initialized';
+const INIT_NOTIFICATION_REQUIRED_MESSAGE =
+  'notifications/initialized must follow initialize';
 
 function isStdioMessageTransport(
   value: unknown
@@ -130,7 +133,11 @@ function isSchemaError(error: unknown): boolean {
 
 function wrapSendForInitTracking(
   transport: StdioMessageTransportLike,
-  state: { sawInitialize: boolean; pendingInitIds: Set<string> }
+  state: {
+    sawInitialize: boolean;
+    sawInitializedNotification: boolean;
+    pendingInitIds: Set<string>;
+  }
 ): void {
   if (!transport.send) return;
   const originalSend = transport.send.bind(transport);
@@ -142,7 +149,11 @@ function wrapSendForInitTracking(
 
 function trackInitializeResponse(
   message: unknown,
-  state: { sawInitialize: boolean; pendingInitIds: Set<string> }
+  state: {
+    sawInitialize: boolean;
+    sawInitializedNotification: boolean;
+    pendingInitIds: Set<string>;
+  }
 ): void {
   try {
     const response = parseJsonRpcResponse(message);
@@ -160,20 +171,38 @@ function trackInitializeResponse(
 
 function handleInitializeMethod(
   methodMessage: JsonRpcMethodMessage & { hasId: true },
-  state: { sawInitialize: boolean; pendingInitIds: Set<string> },
+  state: {
+    sawInitialize: boolean;
+    sawInitializedNotification: boolean;
+    pendingInitIds: Set<string>;
+  },
   originalOnMessage: (message: unknown, extra?: unknown) => void,
   message: unknown,
   extra?: unknown
-): boolean {
+): void {
   state.pendingInitIds.add(getIdKey(methodMessage.id));
   originalOnMessage(message, extra);
-  return true;
+}
+
+function handleInitializedNotification(
+  state: {
+    sawInitialize: boolean;
+    sawInitializedNotification: boolean;
+    pendingInitIds: Set<string>;
+  },
+  originalOnMessage: (message: unknown, extra?: unknown) => void,
+  message: unknown,
+  extra?: unknown
+): void {
+  if (!state.sawInitialize) return;
+  state.sawInitializedNotification = true;
+  originalOnMessage(message, extra);
 }
 
 function handleNonInitializedRequest(
   methodMessage: JsonRpcMethodMessage,
   transport: StdioMessageTransportLike
-): boolean {
+): void {
   if (methodMessage.hasId) {
     sendError(
       transport,
@@ -182,11 +211,28 @@ function handleNonInitializedRequest(
       methodMessage.id
     );
   }
-  return true;
+}
+
+function handleMissingInitializedNotification(
+  methodMessage: JsonRpcMethodMessage,
+  transport: StdioMessageTransportLike
+): void {
+  if (methodMessage.hasId) {
+    sendError(
+      transport,
+      ErrorCode.InvalidRequest,
+      INIT_NOTIFICATION_REQUIRED_MESSAGE,
+      methodMessage.id
+    );
+  }
 }
 
 function createInitGuardHandler(
-  state: { sawInitialize: boolean; pendingInitIds: Set<string> },
+  state: {
+    sawInitialize: boolean;
+    sawInitializedNotification: boolean;
+    pendingInitIds: Set<string>;
+  },
   originalOnMessage: (message: unknown, extra?: unknown) => void,
   transport: StdioMessageTransportLike
 ): (message: unknown, extra?: unknown) => void {
@@ -210,8 +256,18 @@ function createInitGuardHandler(
         return;
       }
 
+      if (methodMessage.method === INITIALIZED_NOTIFICATION_METHOD) {
+        handleInitializedNotification(state, originalOnMessage, message, extra);
+        return;
+      }
+
       if (!state.sawInitialize) {
         handleNonInitializedRequest(methodMessage, transport);
+        return;
+      }
+
+      if (!state.sawInitializedNotification) {
+        handleMissingInitializedNotification(methodMessage, transport);
         return;
       }
 
@@ -228,6 +284,7 @@ export function installStdioInitializationGuards(transport: unknown): void {
 
   const state = {
     sawInitialize: false,
+    sawInitializedNotification: false,
     pendingInitIds: new Set<string>(),
   };
 

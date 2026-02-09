@@ -94,28 +94,6 @@ void describe('tools.registerThinkSeq handler success', () => {
       JSON.stringify(response.structuredContent)
     );
   });
-
-  void it('can include text content when THINKSEQ_INCLUDE_TEXT_CONTENT=1', async (t) => {
-    const previous = process.env.THINKSEQ_INCLUDE_TEXT_CONTENT;
-    process.env.THINKSEQ_INCLUDE_TEXT_CONTENT = '1';
-    t.after(() => {
-      if (previous === undefined) {
-        process.env.THINKSEQ_INCLUDE_TEXT_CONTENT = '';
-        delete process.env.THINKSEQ_INCLUDE_TEXT_CONTENT;
-      } else {
-        process.env.THINKSEQ_INCLUDE_TEXT_CONTENT = previous;
-      }
-    });
-
-    const handler = registerThinkSeqForTests(createOkEngine());
-    const response = await handler(createThoughtInput());
-
-    assert.equal(response.structuredContent.ok, true);
-    assert.equal(
-      response.content[0].text,
-      JSON.stringify(response.structuredContent)
-    );
-  });
 });
 
 void describe('tools.registerThinkSeq diagnostics durationMs (success)', () => {
