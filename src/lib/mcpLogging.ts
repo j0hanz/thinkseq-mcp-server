@@ -1,4 +1,5 @@
 import diagnosticsChannel from 'node:diagnostics_channel';
+import { format } from 'node:util';
 
 import type { LoggingMessageNotificationParams } from '@modelcontextprotocol/sdk/types.js';
 
@@ -101,9 +102,7 @@ export function installConsoleBridge(target: LoggingTarget): {
   const originalLog = console.log;
 
   console.log = (...args: unknown[]) => {
-    const text = args
-      .map((a) => (typeof a === 'string' ? a : JSON.stringify(a)))
-      .join(' ');
+    const text = format(...args);
     if (isReady) {
       send(text);
     } else {

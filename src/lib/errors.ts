@@ -1,3 +1,5 @@
+import { inspect } from 'node:util';
+
 export interface ErrorResponse extends Record<string, unknown> {
   content: { type: 'text'; text: string }[];
   structuredContent: {
@@ -15,6 +17,9 @@ export interface CreateErrorResponseOptions {
 export function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   if (typeof error === 'string' && error.length > 0) return error;
+  if (error !== null && error !== undefined) {
+    return inspect(error, { depth: 2, breakLength: 120, maxArrayLength: 20 });
+  }
   return 'Unknown error';
 }
 

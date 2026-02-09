@@ -1,4 +1,5 @@
 import { execSync } from 'node:child_process';
+import { platform } from 'node:os';
 import { performance } from 'node:perf_hooks';
 
 import { ThinkingEngine } from '../src/engine.js';
@@ -41,14 +42,14 @@ const tryPinProcess = (maskRaw?: string): void => {
   if (!Number.isFinite(mask) || mask <= 0) return;
 
   try {
-    if (process.platform === 'win32') {
+    if (platform() === 'win32') {
       execSync(
         `powershell -NoProfile -Command "$proc = [System.Diagnostics.Process]::GetProcessById(${process.pid}); $proc.ProcessorAffinity = ${mask}"`,
         { stdio: 'ignore' }
       );
       return;
     }
-    if (process.platform === 'linux') {
+    if (platform() === 'linux') {
       execSync(`taskset -p ${mask} ${process.pid}`, { stdio: 'ignore' });
     }
   } catch {
