@@ -43,30 +43,44 @@ function loadServerInstructions(raw: string): string {
   return trimmed.length > 0 ? trimmed : INSTRUCTIONS_FALLBACK;
 }
 
-function registerInstructionsResource(server: ServerLike): void {
-  server.registerResource(
-    'instructions',
-    new ResourceTemplate('internal://instructions', {
-      list: () => ({
-        resources: [
-          {
-            uri: 'internal://instructions',
-            name: 'Instructions',
-            mimeType: 'text/markdown',
-          },
-        ],
-      }),
-    }),
-    { title: 'Instructions', mimeType: 'text/markdown' },
-    (uri: URL) => ({
-      contents: [
+const INSTRUCTIONS_RESOURCE_TEMPLATE = new ResourceTemplate(
+  'internal://instructions',
+  {
+    list: () => ({
+      resources: [
         {
-          uri: uri.href,
-          text: INSTRUCTIONS_TEXT,
+          uri: 'internal://instructions',
+          name: 'Instructions',
           mimeType: 'text/markdown',
         },
       ],
-    })
+    }),
+  }
+);
+
+const INSTRUCTIONS_METADATA = {
+  title: 'Instructions',
+  mimeType: 'text/markdown',
+} as const;
+
+const readInstructionsResource = (
+  uri: URL
+): { contents: { uri: string; text: string; mimeType: string }[] } => ({
+  contents: [
+    {
+      uri: uri.href,
+      text: INSTRUCTIONS_TEXT,
+      mimeType: 'text/markdown',
+    },
+  ],
+});
+
+function registerInstructionsResource(server: ServerLike): void {
+  server.registerResource(
+    'instructions',
+    INSTRUCTIONS_RESOURCE_TEMPLATE,
+    INSTRUCTIONS_METADATA,
+    readInstructionsResource
   );
 }
 

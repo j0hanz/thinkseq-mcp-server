@@ -84,10 +84,13 @@ export function installMcpLogging(target: LoggingTarget): () => void {
   };
 }
 
-function createConsoleSender(target: LoggingTarget): (text: string) => void {
+function createConsoleSender(
+  target: LoggingTarget,
+  level: LoggingMessageNotificationParams['level']
+): (text: string) => void {
   return (text: string) => {
     void target
-      .sendLoggingMessage({ level: 'info', logger: 'console', data: text })
+      .sendLoggingMessage({ level, logger: 'console', data: text })
       .catch(() => undefined);
   };
 }
@@ -96,28 +99,44 @@ export function installConsoleBridge(target: LoggingTarget): {
   flush: () => void;
   restore: () => void;
 } {
-  const buffer: string[] = [];
+  const buffer: { level: 'info' | 'warning'; text: string }[] = [];
   let isReady = false;
-  const send = createConsoleSender(target);
+  const sendInfo = createConsoleSender(target, 'info');
+  const sendWarn = createConsoleSender(target, 'warning');
+
   const originalLog = console.log;
+  const originalWarn = console.warn;
 
   console.log = (...args: unknown[]) => {
     const text = format(...args);
     if (isReady) {
-      send(text);
+      sendInfo(text);
     } else {
-      buffer.push(text);
+      buffer.push({ level: 'info', text });
+    }
+  };
+
+  console.warn = (...args: unknown[]) => {
+    const text = format(...args);
+    if (isReady) {
+      sendWarn(text);
+    } else {
+      buffer.push({ level: 'warning', text });
     }
   };
 
   return {
     flush: () => {
       isReady = true;
-      buffer.forEach(send);
+      buffer.forEach((item) => {
+        if (item.level === 'info') sendInfo(item.text);
+        else sendWarn(item.text);
+      });
       buffer.length = 0;
     },
     restore: () => {
       console.log = originalLog;
+      console.warn = originalWarn;
     },
   };
 }
