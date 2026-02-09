@@ -239,7 +239,7 @@ export class ThinkingEngine {
       ...(details.revisionOf !== undefined && {
         revisionOf: details.revisionOf,
       }),
-      byteLength: Buffer.byteLength(input.thought),
+      byteLength: Buffer.byteLength(input.thought, 'utf8'),
     };
   }
 

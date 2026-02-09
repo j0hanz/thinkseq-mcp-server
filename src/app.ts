@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import process from 'node:process';
 
 import type { RunDependencies } from './appConfig/runDependencies.js';
@@ -35,10 +35,10 @@ const createHandlerFor =
     exit(1);
   };
 
-function getLocalIconData(): string | undefined {
+async function getLocalIconData(): Promise<string | undefined> {
   try {
     const iconPath = new URL('../assets/logo.svg', import.meta.url);
-    const buffer = readFileSync(iconPath);
+    const buffer = await readFile(iconPath);
     if (buffer.length > 2 * 1024 * 1024) {
       console.warn('Warning: logo.svg is larger than 2MB');
     }
@@ -67,7 +67,7 @@ export async function run(deps: RunDependencies = {}): Promise<void> {
   );
   const { name, version } = resolvePackageIdentity(pkg);
 
-  const localIcon = getLocalIconData();
+  const localIcon = await getLocalIconData();
   const server = resolved.createServer(name, version, localIcon);
   installMcpLogging(server);
   const { flush: flushConsole, restore: restoreConsole } =

@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 
 import {
   McpServer,
@@ -30,9 +30,9 @@ const INSTRUCTIONS_URL = new URL('../instructions.md', import.meta.url);
 const INSTRUCTIONS_FALLBACK =
   'ThinkSeq is a tool for structured, sequential thinking with revision support.';
 
-function readInstructionsText(): string {
+async function readInstructionsText(): Promise<string> {
   try {
-    return readFileSync(INSTRUCTIONS_URL, { encoding: 'utf8' });
+    return await readFile(INSTRUCTIONS_URL, { encoding: 'utf8' });
   } catch {
     return INSTRUCTIONS_FALLBACK;
   }
@@ -70,7 +70,7 @@ function registerInstructionsResource(server: ServerLike): void {
   );
 }
 
-const INSTRUCTIONS_TEXT = readInstructionsText();
+const INSTRUCTIONS_TEXT = await readInstructionsText();
 const SERVER_INSTRUCTIONS = loadServerInstructions(INSTRUCTIONS_TEXT);
 const DEFAULT_PACKAGE_READ_TIMEOUT_MS = 2000;
 

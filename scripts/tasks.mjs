@@ -1,15 +1,6 @@
 /* eslint-disable */
 import { spawn } from 'node:child_process';
-import {
-  access,
-  chmod,
-  cp,
-  glob,
-  mkdir,
-  readdir,
-  rm,
-  stat,
-} from 'node:fs/promises';
+import { chmod, cp, glob, mkdir, readdir, rm, stat } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { performance } from 'node:perf_hooks';
@@ -72,21 +63,19 @@ const Logger = {
 };
 
 const System = {
-  async exists(path) {
+  async statSafe(path) {
     try {
-      await access(path);
-      return true;
+      return await stat(path);
     } catch {
-      return false;
+      return null;
     }
   },
+  async exists(path) {
+    return (await this.statSafe(path)) !== null;
+  },
   async isDirectory(path) {
-    try {
-      const stats = await stat(path);
-      return stats.isDirectory();
-    } catch {
-      return false;
-    }
+    const stats = await this.statSafe(path);
+    return stats ? stats.isDirectory() : false;
   },
 
   async remove(paths) {
